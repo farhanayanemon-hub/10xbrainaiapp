@@ -1,0 +1,6 @@
+# Custom configuration file needed for Coolify deployment using Nixpacks
+# This nixpkgs archive contains Node.js v24.11.1 LTS
+# When deploying via Coolify, do not forget to set the NIXPACKS_NODE_VERSION environment variable to 24
+
+[phases.setup]
+nixpkgsArchive = '6f374686605df381de8541c072038472a5ea2e2d'
