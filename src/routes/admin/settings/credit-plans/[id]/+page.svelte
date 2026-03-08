@@ -237,30 +237,7 @@
         </div>
 
         <div class="space-y-2">
-          <div class="flex justify-between">
-            <form
-              method="POST"
-              action="?/delete"
-              use:enhance={() => {
-                if (!confirm("Are you sure you want to delete this credit plan? This action cannot be undone.")) {
-                  return ({ cancel }) => cancel();
-                }
-                isDeleting = true;
-                return async ({ update }) => {
-                  await update();
-                  isDeleting = false;
-                };
-              }}
-            >
-              <Button
-                type="submit"
-                variant="destructive"
-                disabled={isDeleting || data.isDemoMode}
-              >
-                {isDeleting ? "Deleting..." : "Delete Plan"}
-              </Button>
-            </form>
-
+          <div class="flex justify-end">
             <div class="flex space-x-2">
               <Button
                 type="button"
@@ -286,6 +263,31 @@
           {/if}
         </div>
       </form>
+
+      <div class="mt-4 pt-4 border-t">
+        <form
+          method="POST"
+          action="?/delete"
+          use:enhance={() => {
+            if (!confirm("Are you sure you want to delete this credit plan? This action cannot be undone.")) {
+              return ({ cancel }) => cancel();
+            }
+            isDeleting = true;
+            return async ({ update }) => {
+              await update();
+              isDeleting = false;
+            };
+          }}
+        >
+          <Button
+            type="submit"
+            variant="destructive"
+            disabled={isDeleting || data.isDemoMode}
+          >
+            {isDeleting ? "Deleting..." : "Delete Plan"}
+          </Button>
+        </form>
+      </div>
     </Card.Content>
   </Card.Root>
 </div>
