@@ -4,6 +4,7 @@
   import { Badge } from "$lib/components/ui/badge/index.js";
   import {
     UploadIcon,
+    DownloadIcon,
     CheckIcon,
     AlertTriangleIcon,
     ShieldIcon,
@@ -15,6 +16,8 @@
   let selectedFile: File | null = $state(null);
   let uploading = $state(false);
   let uploadProgress = $state(0);
+  let downloading = $state(false);
+  let downloadError = $state("");
   let result: {
     success: boolean;
     message: string;
@@ -93,6 +96,42 @@
     }
   }
 
+  async function downloadBackup() {
+    downloading = true;
+    downloadError = "";
+
+    try {
+      const response = await fetch("/api/admin/app-backup");
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ message: "Download failed" }));
+        downloadError = data.message || "Failed to create backup.";
+        return;
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition");
+      let filename = "app-backup.tar.gz";
+      if (disposition) {
+        const match = disposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      downloadError = err.message || "An unexpected error occurred.";
+    } finally {
+      downloading = false;
+    }
+  }
+
   function formatFileSize(bytes: number): string {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
@@ -148,6 +187,54 @@
           </ul>
         </div>
       </div>
+    </Card.Content>
+  </Card.Root>
+
+  <Card.Root>
+    <Card.Header>
+      <Card.Title class="flex items-center gap-2">
+        <DownloadIcon class="w-5 h-5" />
+        Download Current Backup
+      </Card.Title>
+      <Card.Description>
+        Download a backup of your current app source code before updating.
+        This allows you to restore the previous version if needed.
+      </Card.Description>
+    </Card.Header>
+    <Card.Content class="space-y-4">
+      <div class="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <FileIcon class="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p class="font-medium text-sm">Current App Source Code</p>
+            <p class="text-xs text-muted-foreground">
+              Includes src/, static/, configs (excludes node_modules, .git, uploads)
+            </p>
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          disabled={downloading}
+          onclick={downloadBackup}
+        >
+          {#if downloading}
+            <LoaderIcon class="w-4 h-4 animate-spin mr-2" />
+            Creating...
+          {:else}
+            <DownloadIcon class="w-4 h-4 mr-2" />
+            Download Backup
+          {/if}
+        </Button>
+      </div>
+
+      {#if downloadError}
+        <div class="bg-destructive/10 border border-destructive/20 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangleIcon class="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+          <p class="text-sm text-muted-foreground">{downloadError}</p>
+        </div>
+      {/if}
     </Card.Content>
   </Card.Root>
 
