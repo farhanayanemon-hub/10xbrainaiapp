@@ -16,6 +16,7 @@
     MailIcon,
     HomeIcon,
     CirclePlusIcon,
+    MessageCircleIcon,
   } from "$lib/icons/index.js";
 
   let { children, data } = $props();
@@ -87,6 +88,12 @@
       label: "Mailing",
       path: "/admin/settings/mailing",
       icon: MailIcon,
+    },
+    {
+      id: "prompt-suggestions",
+      label: "Prompt Suggestions",
+      path: "/admin/settings/prompt-suggestions",
+      icon: MessageCircleIcon,
     },
   ];
 

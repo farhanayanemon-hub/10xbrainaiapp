@@ -110,6 +110,17 @@ src/
 - `/verify-otp` page is standalone (no sidebar) — added to `isStandalonePage` in root layout
 - Key files: `src/lib/server/otp-service.ts`, `src/routes/verify-otp/`, `src/routes/register/+page.server.ts`
 
+## Prompt Suggestions Carousel
+
+- Auto-scrolling single-line carousel of prompt suggestions on the new chat welcome screen
+- Admin-manageable via `/admin/settings/prompt-suggestions` (add, edit, reorder, enable/disable)
+- Stored in `admin_settings` table (category: `prompt_suggestions`, key: `prompt_suggestions`)
+- Value is JSON array of `{id, text, prompt, order, isActive}` objects
+- Default 4 suggestions provided if none saved in DB
+- Public API: `GET /api/prompt-suggestions` returns active suggestions sorted by order
+- Carousel auto-scrolls, pauses on hover/touch, shows edge gradients
+- Key files: `src/lib/server/prompt-suggestions.ts`, `src/lib/components/chat/PromptTemplates.svelte`, `src/routes/admin/settings/prompt-suggestions/`
+
 ## Backups
 
 - `opaybd-backup/` - Archived Opaybd payment integration files for reference
