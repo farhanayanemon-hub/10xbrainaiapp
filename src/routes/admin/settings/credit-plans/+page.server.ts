@@ -5,14 +5,22 @@ import { fail, redirect } from '@sveltejs/kit'
 import { isDemoModeEnabled, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js'
 
 export const load: PageServerLoad = async () => {
-  const allPlans = await db
-    .select()
-    .from(creditPlans)
-    .orderBy(creditPlans.creditType, desc(creditPlans.createdAt))
+  try {
+    const allPlans = await db
+      .select()
+      .from(creditPlans)
+      .orderBy(creditPlans.creditType, desc(creditPlans.createdAt))
 
-  return {
-    creditPlans: allPlans,
-    isDemoMode: isDemoModeEnabled()
+    return {
+      creditPlans: allPlans,
+      isDemoMode: isDemoModeEnabled()
+    }
+  } catch (error) {
+    console.error('Error loading credit plans (table may not exist yet):', error)
+    return {
+      creditPlans: [],
+      isDemoMode: isDemoModeEnabled()
+    }
   }
 }
 
