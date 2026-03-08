@@ -14,6 +14,7 @@
     GemIcon,
     ShieldIcon,
     MailIcon,
+    UploadIcon,
   } from "$lib/icons/index.js";
 
   let { children, data } = $props();
@@ -73,6 +74,12 @@
       label: "Mailing",
       path: "/admin/settings/mailing",
       icon: MailIcon,
+    },
+    {
+      id: "app-update",
+      label: "App Update",
+      path: "/admin/settings/app-update",
+      icon: UploadIcon,
     },
   ];
 

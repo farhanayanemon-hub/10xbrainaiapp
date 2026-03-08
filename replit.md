@@ -57,6 +57,15 @@ src/
 - Cloudflare R2 for cloud storage
 - `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` - Bot protection
 
+## Admin Features
+
+- **App Update**: Admin panel includes an "App Update" page at `/admin/settings/app-update` where admins can upload a zip file to update app code while preserving database, env vars, uploads, and settings. The endpoint includes path traversal protection, symlink rejection, and rollback on npm install failure.
+
+## Backups
+
+- `opaybd-backup/` - Archived Opaybd payment integration files for future reference
+- `opaybd-backup.tar.gz` - Compressed archive of the same
+
 ## Deployment
 
 Uses `@sveltejs/adapter-node`. Build with `npm run build`, run with `node build/index.js`.
