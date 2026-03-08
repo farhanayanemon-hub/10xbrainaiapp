@@ -15,6 +15,7 @@
     ShieldIcon,
     MailIcon,
     HomeIcon,
+    CirclePlusIcon,
   } from "$lib/icons/index.js";
 
   let { children, data } = $props();
@@ -50,6 +51,12 @@
       label: "Pricing Plans",
       path: "/admin/settings/plans",
       icon: GemIcon,
+    },
+    {
+      id: "credit-plans",
+      label: "Credit Plans",
+      path: "/admin/settings/credit-plans",
+      icon: CirclePlusIcon,
     },
     {
       id: "oauth-providers",

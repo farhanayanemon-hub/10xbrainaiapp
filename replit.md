@@ -73,6 +73,18 @@ src/
 - `RenewalBanner` component shows renewal prompts in the main app layout
 - Key files: `src/lib/server/opaybd.ts`, `src/lib/server/payment-router.ts`, `src/routes/api/opaybd/`
 
+## Extra Credits System
+
+- Users can purchase additional generation credits beyond their plan limits
+- Credits are per-type (text, image, video, audio) and deducted oldest-first
+- Plan limits are checked first; if exceeded, extra credits are used automatically
+- DB tables: `credit_plan` (admin-defined packs), `user_credit` (purchased credits per user)
+- Admin manages credit plans at `/admin/settings/credit-plans`
+- Users view balances and purchase at `/settings/billing` (Extra Credits section)
+- Purchase API: `POST /api/credits/purchase` routes to Stripe or Opaybd
+- Key files: `src/lib/server/credit-service.ts`, `src/routes/api/credits/purchase/+server.ts`
+- Pricing pages show feature names without exact limit numbers; usage page shows actual counts
+
 ## Backups
 
 - `opaybd-backup/` - Archived Opaybd payment integration files for reference

@@ -18,6 +18,8 @@
     GemIcon,
     HistoryIcon,
     WalletIcon,
+    CirclePlusIcon,
+    SparklesIcon,
   } from "$lib/icons/index.js";
 
   let { data } = $props();
@@ -35,6 +37,49 @@
   let baselinePaymentCount = $state(0);
   let pendingOpayTransactionId = $state<string | null>(null);
   let isVerifyingPendingOpay = $state(false);
+  let purchasingCreditPlanId = $state<string | null>(null);
+
+  const creditTypeLabels: Record<string, string> = {
+    text: 'Text Generation',
+    image: 'Image Generation',
+    video: 'Video Generation',
+    audio: 'Audio Generation',
+  };
+
+  const isOpaybd = $derived(billingData.activePaymentProvider === 'opaybd');
+
+  function formatCreditPrice(plan: any): string {
+    if (isOpaybd && plan.priceAmountBdt) {
+      return '৳' + (plan.priceAmountBdt / 100).toLocaleString('en-BD');
+    }
+    return '$' + (plan.priceAmount / 100).toFixed(2).replace(/\.00$/, '');
+  }
+
+  async function purchaseCredit(creditPlanId: string) {
+    purchasingCreditPlanId = creditPlanId;
+    try {
+      const res = await fetch('/api/credits/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creditPlanId }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(result.error || 'Failed to purchase credits');
+        return;
+      }
+      if (result.provider === 'opaybd' && result.paymentUrl) {
+        window.location.href = result.paymentUrl;
+      } else if (result.provider === 'stripe' && result.sessionId) {
+        const { goto } = await import('$app/navigation');
+        goto(`/checkout?session_id=${result.sessionId}`);
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to purchase credits');
+    } finally {
+      purchasingCreditPlanId = null;
+    }
+  }
 
   // Function to fetch fresh billing data with retry logic
   async function refreshBillingData(
@@ -413,11 +458,6 @@
           period: billingData.subscription.plan.billingInterval,
           tier: billingData.subscription.plan.tier,
           features: billingData.subscription.plan.features,
-          limits: {
-            textGeneration: billingData.subscription.plan.textGenerationLimit,
-            imageGeneration: billingData.subscription.plan.imageGenerationLimit,
-            videoGeneration: billingData.subscription.plan.videoGenerationLimit,
-          },
         }
       : {
           name: m["billing.free_plan"](),
@@ -425,11 +465,6 @@
           period: "month",
           tier: "free",
           features: [m["billing.feature_limited_ai_access"](), m["billing.feature_text_only_models"]()],
-          limits: {
-            textGeneration: 10,
-            imageGeneration: 2,
-            videoGeneration: 0,
-          },
         }
   );
 
@@ -675,6 +710,72 @@
             </p>
           {/if}
         </div>
+      {/if}
+    </Card.Content>
+  </Card.Root>
+
+  <!-- Extra Credits -->
+  <Card.Root class="shadow-none">
+    <Card.Header>
+      <Card.Title class="flex items-center gap-2">
+        <SparklesIcon class="w-5 h-5" />
+        Extra Credits
+      </Card.Title>
+      <Card.Description>Purchase additional generation credits beyond your plan limits</Card.Description>
+    </Card.Header>
+    <Card.Content class="space-y-6">
+      {#if billingData.userCredits && (billingData.userCredits.text > 0 || billingData.userCredits.image > 0 || billingData.userCredits.video > 0 || billingData.userCredits.audio > 0)}
+        <div>
+          <h4 class="text-sm font-medium mb-3">Your Credit Balance</h4>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {#each Object.entries(billingData.userCredits) as [type, amount]}
+              {#if amount > 0}
+                <div class="border rounded-lg p-3 text-center">
+                  <p class="text-2xl font-bold">{amount}</p>
+                  <p class="text-xs text-muted-foreground">{creditTypeLabels[type] || type}</p>
+                </div>
+              {/if}
+            {/each}
+          </div>
+        </div>
+      {/if}
+
+      {#if billingData.creditPlans && billingData.creditPlans.length > 0}
+        <div>
+          <h4 class="text-sm font-medium mb-3">Available Credit Packs</h4>
+          <div class="grid gap-3 sm:grid-cols-2">
+            {#each billingData.creditPlans as plan}
+              <div class="border rounded-lg p-4 flex flex-col gap-2">
+                <div class="flex items-center justify-between">
+                  <h5 class="font-medium">{plan.name}</h5>
+                  <Badge variant="secondary">{creditTypeLabels[plan.creditType] || plan.creditType}</Badge>
+                </div>
+                {#if plan.description}
+                  <p class="text-sm text-muted-foreground">{plan.description}</p>
+                {/if}
+                <div class="flex items-center justify-between mt-auto pt-2">
+                  <span class="text-lg font-semibold">{formatCreditPrice(plan)}</span>
+                  <span class="text-sm text-muted-foreground">{plan.creditAmount} credits</span>
+                </div>
+                <Button
+                  size="sm"
+                  class="w-full mt-1 cursor-pointer"
+                  disabled={purchasingCreditPlanId === plan.id}
+                  onclick={() => purchaseCredit(plan.id)}
+                >
+                  {#if purchasingCreditPlanId === plan.id}
+                    Purchasing...
+                  {:else}
+                    <CirclePlusIcon class="w-4 h-4 mr-1" />
+                    Buy Credits
+                  {/if}
+                </Button>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {:else}
+        <p class="text-sm text-muted-foreground text-center py-4">No credit packs available at this time.</p>
       {/if}
     </Card.Content>
   </Card.Root>

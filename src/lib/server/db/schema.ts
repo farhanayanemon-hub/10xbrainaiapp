@@ -551,3 +551,46 @@ export const adminFiles = pgTable("admin_files", {
 }, (table) => [
         index('admin_files_category_idx').on(table.category),
 ])
+
+export const creditPlans = pgTable("credit_plan", {
+        id: text("id")
+                .primaryKey()
+                .$defaultFn(() => randomUUID()),
+        name: text("name").notNull(),
+        description: text("description"),
+        creditType: text("creditType", {
+                enum: ["text", "image", "video", "audio"]
+        }).notNull(),
+        creditAmount: integer("creditAmount").notNull(),
+        priceAmount: integer("priceAmount").notNull(),
+        priceAmountBdt: integer("priceAmountBdt"),
+        currency: text("currency").notNull().default("usd"),
+        isActive: boolean("isActive").notNull().default(true),
+        createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+        updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
+})
+
+export const userCredits = pgTable("user_credit", {
+        id: text("id")
+                .primaryKey()
+                .$defaultFn(() => randomUUID()),
+        userId: text("userId")
+                .notNull()
+                .references(() => users.id, { onDelete: "cascade" }),
+        creditType: text("creditType", {
+                enum: ["text", "image", "video", "audio"]
+        }).notNull(),
+        creditAmount: integer("creditAmount").notNull(),
+        purchasedAmount: integer("purchasedAmount").notNull(),
+        creditPlanId: text("creditPlanId")
+                .references(() => creditPlans.id, { onDelete: "set null" }),
+        paymentProvider: text("paymentProvider", {
+                enum: ["stripe", "opaybd"]
+        }).notNull().default("stripe"),
+        transactionId: text("transactionId"),
+        purchasedAt: timestamp("purchasedAt", { mode: "date" }).notNull().defaultNow(),
+        expiresAt: timestamp("expiresAt", { mode: "date" }),
+        createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+}, (table) => [
+        index('user_credits_user_type_idx').on(table.userId, table.creditType),
+])

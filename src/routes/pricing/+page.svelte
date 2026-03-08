@@ -456,7 +456,6 @@
 
           <!-- Combined Features and Limits List -->
           <ul class="space-y-3 mb-6 flex-grow">
-            <!-- Limits as features (only show if limit is not 0) -->
             {#if plan.textGenerationLimit !== 0}
               <li class="flex items-center text-sm">
                 <div
@@ -470,9 +469,7 @@
                     <path d="M6.5 1l-3.5 3.5-1.5-1.5-1 1 2.5 2.5 4.5-4.5z" />
                   </svg>
                 </div>
-                {formatLimit(plan.textGenerationLimit)} Text Generation{plan.textGenerationLimit
-                  ? "/mo"
-                  : ""}
+                Text Generation
               </li>
             {/if}
             {#if plan.imageGenerationLimit !== 0}
@@ -488,9 +485,7 @@
                     <path d="M6.5 1l-3.5 3.5-1.5-1.5-1 1 2.5 2.5 4.5-4.5z" />
                   </svg>
                 </div>
-                {formatLimit(plan.imageGenerationLimit)} Image Generation{plan.imageGenerationLimit
-                  ? "/mo"
-                  : ""}
+                Image Generation
               </li>
             {/if}
             {#if plan.videoGenerationLimit !== 0}
@@ -506,9 +501,7 @@
                     <path d="M6.5 1l-3.5 3.5-1.5-1.5-1 1 2.5 2.5 4.5-4.5z" />
                   </svg>
                 </div>
-                {formatLimit(plan.videoGenerationLimit)} Video Generation{plan.videoGenerationLimit
-                  ? "/mo"
-                  : ""}
+                Video Generation
               </li>
             {/if}
             {#if plan.audioGenerationLimit !== 0}
@@ -524,9 +517,7 @@
                     <path d="M6.5 1l-3.5 3.5-1.5-1.5-1 1 2.5 2.5 4.5-4.5z" />
                   </svg>
                 </div>
-                {formatLimit(plan.audioGenerationLimit)} Audio Generation{plan.audioGenerationLimit
-                  ? "/mo"
-                  : ""}
+                Audio Generation
               </li>
             {/if}
             <!-- Additional features -->
