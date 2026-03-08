@@ -10,7 +10,10 @@
     StarIcon,
     CameraIcon,
     MicIcon,
+    ImagesIcon,
+    AudioLinesIcon,
   } from "$lib/icons/index.js";
+  import { goto } from "$app/navigation";
   import { VoiceModeState } from "./voice-mode-state.svelte.js";
   import { GUEST_MESSAGE_LIMIT } from "$lib/constants/guest-limits.js";
   import { getAllToolNames, getToolDisplayName } from "$lib/ai/tools/index.js";
@@ -591,6 +594,14 @@
               <PromptInputActionMenuItem onSelect={captureScreenshot}>
                 <CameraIcon class="mr-2 size-4" />
                 {m["interface.take_screenshot"]()}
+              </PromptInputActionMenuItem>
+              <PromptInputActionMenuItem onSelect={() => goto("/image-video")}>
+                <ImagesIcon class="mr-2 size-4" />
+                {m["nav.image_video"]()}
+              </PromptInputActionMenuItem>
+              <PromptInputActionMenuItem onSelect={() => goto("/audio")}>
+                <AudioLinesIcon class="mr-2 size-4" />
+                {m["nav.audio"]()}
               </PromptInputActionMenuItem>
               {#if (promptInputContext?.files?.length ?? 0) > 0}
                 <PromptInputActionMenuItem
