@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { getContext } from "svelte";
   import Button from "$lib/components/ui/button/button.svelte";
   import * as Card from "$lib/components/ui/card/index.js";
   import { Badge } from "$lib/components/ui/badge/index.js";
@@ -7,7 +6,6 @@
   import { Switch } from "$lib/components/ui/switch/index.js";
   import { toast } from "svelte-sonner";
   import { goto } from "$app/navigation";
-  import type { SettingsState } from "$lib/stores/settings.svelte.js";
 
   // Import icons
   import {
@@ -18,13 +16,15 @@
 
   let { data } = $props();
 
-  // Get settings from context
-  const settingsState = getContext<SettingsState>("settings");
-
   const allPlans = data.plans || [];
   const currentSubscription = data.currentSubscription;
   const user = data.user;
   const userData = data.userData;
+
+  // Currency display based on active payment provider
+  const activeProvider = data.activePaymentProvider || "stripe";
+  const isOpaybd = activeProvider === "opaybd";
+  const currencySymbol = isOpaybd ? "৳" : "$";
 
   // Billing interval toggle state
   let isYearly = $state(false);
@@ -84,6 +84,26 @@
     if (limit === null) return "Unlimited";
     if (limit === 0) return "Not included";
     return limit.toLocaleString();
+  }
+
+  // Format price based on active payment provider
+  function formatPrice(plan: { priceAmount: number; priceAmountBdt?: number | null }): string {
+    if (isOpaybd && plan.priceAmountBdt) {
+      // BDT: priceAmountBdt is in paisa, convert to BDT
+      return (plan.priceAmountBdt / 100).toLocaleString("en-BD");
+    }
+    // USD: priceAmount is in cents, convert to dollars
+    return (plan.priceAmount / 100).toFixed(2).replace(/\.00$/, "");
+  }
+
+  // Format monthly price for yearly plans
+  function formatMonthlyPrice(plan: { priceAmount: number; priceAmountBdt?: number | null }): string {
+    if (isOpaybd && plan.priceAmountBdt) {
+      return (plan.priceAmountBdt / 100 / 12).toLocaleString("en-BD", {
+        maximumFractionDigits: 0,
+      });
+    }
+    return (plan.priceAmount / 100 / 12).toFixed(2).replace(/\.00$/, "");
   }
 
   async function handleSubscribe(priceId: string, planName: string) {
@@ -201,7 +221,7 @@
             updateResult.subscription.proration_amount / 100
           ).toFixed(2);
           toast.info(
-            `A proration charge of $${prorationFormatted} has been applied.`
+            `A proration charge of ${currencySymbol}${prorationFormatted} has been applied.`
           );
         }
 
@@ -262,11 +282,17 @@
         throw new Error("Failed to create checkout session");
       }
 
-      const { clientSecret } = await response.json();
+      const result = await response.json();
 
-      // Redirect to checkout page with client secret
+      // Handle Opaybd provider - redirect to external payment page
+      if (result.provider === 'opaybd') {
+        window.location.href = result.redirectUrl;
+        return;
+      }
+
+      // Default Stripe flow - redirect to checkout page with client secret
       goto(
-        `/checkout?client_secret=${clientSecret}&plan=${encodeURIComponent(planName)}`
+        `/checkout?client_secret=${result.clientSecret}&plan=${encodeURIComponent(planName)}`
       );
     } catch (error) {
       console.error("Error creating checkout session:", error);
@@ -276,7 +302,7 @@
 </script>
 
 <svelte:head>
-  <title>Pricing Plans - {settingsState.siteName}</title>
+  <title>Pricing Plans - AI Models Platform</title>
   <meta
     name="description"
     content="Choose the perfect plan for your AI needs. Access 65+ text, image, video generation models."
@@ -350,7 +376,7 @@
               <div>
                 <h3 class="text-lg font-semibold mb-0.5">{freePlan.name}</h3>
                 <div class="flex items-baseline gap-1">
-                  <span class="text-2xl font-semibold">$0</span>
+                  <span class="text-2xl font-semibold">{currencySymbol}0</span>
                   <span class="text-sm text-muted-foreground">/forever</span>
                 </div>
               </div>
@@ -418,14 +444,12 @@
 
           <div class="mb-6">
             <span class="text-4xl font-bold">
-              ${(plan.priceAmount / 100).toFixed(2).replace(/\.00$/, "")}
+              {currencySymbol}{formatPrice(plan)}
             </span>
             <span class="text-muted-foreground">/{plan.billingInterval}</span>
             {#if plan.billingInterval === "year"}
               <div class="text-sm text-muted-foreground mt-2">
-                ${(plan.priceAmount / 100 / 12)
-                  .toFixed(2)
-                  .replace(/\.00$/, "")}/month billed annually
+                {currencySymbol}{formatMonthlyPrice(plan)}/month billed annually
               </div>
             {/if}
           </div>

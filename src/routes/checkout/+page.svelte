@@ -222,10 +222,10 @@
     </Card.Content>
   </Card.Root>
 
-  <!-- Security Notice -->
+  <!-- Security Notice with Provider Branding -->
   <div class="mt-5 text-center">
     <p class="text-sm text-muted-foreground">
-      🔒 Secure checkout powered by Stripe. Your payment information is
+      Secure checkout powered by {data.activeProvider === 'opaybd' ? 'Opaybd' : 'Stripe'}. Your payment information is
       encrypted and protected.
     </p>
   </div>

@@ -2,6 +2,7 @@ import type { PageServerLoad } from './$types'
 import { redirect } from '@sveltejs/kit'
 import { getLandingSettings } from '$lib/server/admin-settings.js'
 import { getPricingPlans } from '$lib/server/pricing-plans-seeder.js'
+import { getActivePaymentProvider } from '$lib/server/settings-store.js'
 
 export const load: PageServerLoad = async ({ locals }) => {
   const defaultPage = locals.settings?.defaultPage || 'landing'
@@ -10,10 +11,11 @@ export const load: PageServerLoad = async ({ locals }) => {
     throw redirect(302, '/newchat')
   }
 
-  const [landing, plans] = await Promise.all([
+  const [landing, plans, activePaymentProvider] = await Promise.all([
     getLandingSettings(),
-    getPricingPlans('month')
+    getPricingPlans('month'),
+    getActivePaymentProvider()
   ])
 
-  return { landing, plans }
+  return { landing, plans, activePaymentProvider }
 }

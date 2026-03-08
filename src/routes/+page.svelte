@@ -110,8 +110,16 @@
     answer: l(`faq_${i + 1}_answer`, defaultFaqs[i].a),
   }));
 
-  function formatPrice(cents: number): string {
-    return "$" + (cents / 100).toFixed(cents % 100 === 0 ? 0 : 2);
+  const isOpaybd = $derived(data.activePaymentProvider === 'opaybd');
+  const currencySymbol = $derived(isOpaybd ? '৳' : '$');
+
+  function formatPrice(plan: any): string {
+    if (isOpaybd && plan.priceAmountBdt != null) {
+      const bdt = plan.priceAmountBdt / 100;
+      return '৳' + bdt.toLocaleString('en-BD');
+    }
+    const usd = plan.priceAmount / 100;
+    return '$' + usd.toFixed(plan.priceAmount % 100 === 0 ? 0 : 2);
   }
 
   const allPlans = data.plans || [];
@@ -458,7 +466,7 @@
                 <div>
                   <h3 class="text-lg font-semibold mb-0.5">{freePlan.name}</h3>
                   <div class="flex items-baseline gap-1">
-                    <span class="text-2xl font-semibold">{formatPrice(freePlan.priceAmount)}</span>
+                    <span class="text-2xl font-semibold">{formatPrice(freePlan)}</span>
                     <span class="text-sm text-muted-foreground">/forever</span>
                   </div>
                 </div>
@@ -503,7 +511,7 @@
             <Card.Content class="px-8 py-4 text-center h-full flex flex-col">
               <h3 class="text-xl font-bold mb-4">{plan.name}</h3>
               <div class="mb-6">
-                <span class="text-4xl font-bold">{formatPrice(plan.priceAmount)}</span>
+                <span class="text-4xl font-bold">{formatPrice(plan)}</span>
                 <span class="text-muted-foreground">/{plan.billingInterval}</span>
               </div>
               <ul class="space-y-3 mb-6 flex-grow">

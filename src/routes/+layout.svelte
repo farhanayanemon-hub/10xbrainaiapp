@@ -16,6 +16,7 @@
   import ChatSidebar from "$lib/components/ChatSidebar.svelte";
   import Header from "$lib/components/Header.svelte";
   import Favicon from "$lib/components/Favicon.svelte";
+  import RenewalBanner from "$lib/components/RenewalBanner.svelte";
   import { ChatState } from "$lib/components/chat-state.svelte.js";
   import { SettingsState } from "$lib/stores/settings.svelte.js";
 
@@ -112,6 +113,12 @@
     <div class="flex flex-col h-screen w-full">
       <!-- Global Header -->
       <Header {data} />
+
+      {#if data.renewalInfo?.needsRenewal}
+        <div class="px-4 pt-2">
+          <RenewalBanner renewal={data.renewalInfo} />
+        </div>
+      {/if}
 
       <!-- Page content area -->
       <div class="flex-1 overflow-auto">

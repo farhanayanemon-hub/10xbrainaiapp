@@ -1,7 +1,7 @@
 import { handle as authHandle } from "./auth.js"
 import type { Handle } from "@sveltejs/kit"
 import { sequence } from "@sveltejs/kit/hooks"
-import { settingsStore } from '$lib/server/settings-store'
+import { settingsStore, getActivePaymentProvider } from '$lib/server/settings-store'
 import { storageService } from '$lib/server/storage.js'
 import { paraglideMiddleware } from "./paraglide/server"
 import { db, users } from '$lib/server/db/index.js'
@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm'
 import type { Session } from "@auth/sveltekit"
 import { securityHeaders } from '$lib/server/security-headers.js'
 import { authRateLimitMiddleware } from '$lib/server/auth-middleware.js'
+import { OpayService } from '$lib/server/opaybd.js'
 
 // Settings handle - loads and caches site settings
 const settingsHandle: Handle = async ({ event, resolve }) => {
@@ -253,7 +254,40 @@ const enhancedAuthHandle: Handle = async ({ event, resolve }) => {
   return response;
 };
 
-// Combine all handles: security headers, auth rate limiting, settings, storage warming, locale default, paraglide, and enhanced auth
+const opayRenewalHandle: Handle = async ({ event, resolve }) => {
+  try {
+    const activeProvider = await getActivePaymentProvider();
+    if (activeProvider !== 'opaybd') {
+      return resolve(event);
+    }
+  } catch {
+    return resolve(event);
+  }
+
+  const lastCheck = event.cookies.get('opay_renewal_check');
+  const now = Date.now();
+  const oneHour = 60 * 60 * 1000;
+
+  if (!lastCheck || (now - parseInt(lastCheck)) > oneHour) {
+    OpayService.markExpiredSubscriptionsForRenewal().catch(error => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[Opaybd Renewal] Failed to check expired subscriptions:', error.message);
+      }
+    });
+
+    event.cookies.set('opay_renewal_check', now.toString(), {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 3600
+    });
+  }
+
+  return resolve(event);
+};
+
+// Combine all handles: security headers, auth rate limiting, settings, storage warming, locale default, paraglide, enhanced auth, and opaybd renewal
 // Storage warming runs after settings to ensure R2 credentials are loaded before storage initialization
 export const handle: Handle = sequence(
   securityHeaders,
@@ -262,5 +296,6 @@ export const handle: Handle = sequence(
   storageWarmingHandle,
   localeDefaultHandle,
   paraglideHandle,
-  enhancedAuthHandle
+  enhancedAuthHandle,
+  opayRenewalHandle
 )

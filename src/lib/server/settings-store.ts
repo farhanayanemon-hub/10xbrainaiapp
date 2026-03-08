@@ -14,9 +14,11 @@ export interface CachedSettings {
 
   // Payment settings
   paymentEnvironment: string;
+  activePaymentProvider: 'stripe' | 'opaybd';
   stripePublishableKey: string;
   stripeSecretKey: string;
   stripeWebhookSecret: string;
+  opayApiKey: string;
 
   // OAuth settings
   googleEnabled: boolean;
@@ -77,6 +79,7 @@ export interface PublicSettings {
   defaultPage: string;
   publicOrigin: string;
   paymentEnvironment: string;
+  activePaymentProvider: 'stripe' | 'opaybd';
   stripePublishableKey: string; // pk_test_* / pk_live_* - designed for client use
   googleEnabled: boolean;
   appleEnabled: boolean;
@@ -108,6 +111,7 @@ export function toPublicSettings(settings: CachedSettings): PublicSettings {
     defaultPage: settings.defaultPage,
     publicOrigin: settings.publicOrigin,
     paymentEnvironment: settings.paymentEnvironment,
+    activePaymentProvider: settings.activePaymentProvider,
     stripePublishableKey: settings.stripePublishableKey,
     googleEnabled: settings.googleEnabled,
     appleEnabled: settings.appleEnabled,
@@ -135,9 +139,11 @@ const DEFAULT_SETTINGS: Omit<CachedSettings, 'lastUpdated'> = {
   defaultPage: "landing",
   publicOrigin: "",
   paymentEnvironment: "test",
+  activePaymentProvider: "stripe",
   stripePublishableKey: "",
   stripeSecretKey: "",
   stripeWebhookSecret: "",
+  opayApiKey: "",
   googleEnabled: true,
   googleClientId: "",
   googleClientSecret: "",
@@ -301,9 +307,11 @@ class SettingsStore {
         defaultPage: generalSettings.default_page || DEFAULT_SETTINGS.defaultPage,
         publicOrigin: generalSettings.public_origin || DEFAULT_SETTINGS.publicOrigin,
         paymentEnvironment: paymentSettings.environment || DEFAULT_SETTINGS.paymentEnvironment,
+        activePaymentProvider: (paymentSettings.active_payment_provider as 'stripe' | 'opaybd') || DEFAULT_SETTINGS.activePaymentProvider,
         stripePublishableKey: paymentSettings.stripe_publishable_key || DEFAULT_SETTINGS.stripePublishableKey,
         stripeSecretKey: paymentSettings.stripe_secret_key || DEFAULT_SETTINGS.stripeSecretKey,
         stripeWebhookSecret: paymentSettings.stripe_webhook_secret || DEFAULT_SETTINGS.stripeWebhookSecret,
+        opayApiKey: paymentSettings.opay_api_key || DEFAULT_SETTINGS.opayApiKey,
         googleEnabled: oauthSettings.google_enabled !== 'false',
         googleClientId: oauthSettings.google_client_id || DEFAULT_SETTINGS.googleClientId,
         googleClientSecret: oauthSettings.google_client_secret || DEFAULT_SETTINGS.googleClientSecret,
@@ -460,7 +468,24 @@ export async function getPaymentSettings() {
     paymentEnvironment: settings.paymentEnvironment,
     stripePublishableKey: settings.stripePublishableKey,
     stripeSecretKey: settings.stripeSecretKey,
-    stripeWebhookSecret: settings.stripeWebhookSecret
+    stripeWebhookSecret: settings.stripeWebhookSecret,
+    activePaymentProvider: settings.activePaymentProvider,
+    opayApiKey: settings.opayApiKey
+  };
+}
+
+export async function getActivePaymentProvider(): Promise<'stripe' | 'opaybd'> {
+  return await settingsStore.getSetting('activePaymentProvider');
+}
+
+export async function getOpayApiKey(): Promise<string> {
+  return await settingsStore.getSetting('opayApiKey');
+}
+
+export async function getOpaySettings() {
+  const settings = await settingsStore.getSettings();
+  return {
+    apiKey: settings.opayApiKey
   };
 }
 
