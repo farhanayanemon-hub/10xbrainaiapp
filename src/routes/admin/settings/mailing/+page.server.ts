@@ -3,13 +3,16 @@ import { fail } from '@sveltejs/kit'
 import { getMailingSettings, adminSettingsService } from '$lib/server/admin-settings'
 import { settingsStore } from '$lib/server/settings-store'
 import { emailService } from '$lib/server/email'
+import { EmailTemplateService } from '$lib/server/email-templates.js'
 import { isDemoModeEnabled, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js'
 
 export const load: PageServerLoad = async () => {
   try {
-    const settings = await getMailingSettings();
+    const [settings, templates] = await Promise.all([
+      getMailingSettings(),
+      EmailTemplateService.getTemplateList()
+    ])
 
-    // Provide default values if settings don't exist
     return {
       settings: {
         smtpHost: settings.smtp_host || "",
@@ -20,11 +23,18 @@ export const load: PageServerLoad = async () => {
         fromEmail: settings.from_email || "",
         fromName: settings.from_name || ""
       },
+      templates: templates.map(t => ({
+        name: t.name,
+        label: t.label,
+        description: t.description,
+        subject: t.subject,
+        variables: t.variables,
+        isCustom: t.isCustom,
+      })),
       isDemoMode: isDemoModeEnabled()
     }
   } catch (error) {
     console.error('Failed to load mailing settings:', error);
-    // Fallback to empty values
     return {
       settings: {
         smtpHost: "",
@@ -35,6 +45,7 @@ export const load: PageServerLoad = async () => {
         fromEmail: "",
         fromName: ""
       },
+      templates: [],
       isDemoMode: isDemoModeEnabled()
     }
   }
@@ -42,11 +53,8 @@ export const load: PageServerLoad = async () => {
 
 export const actions: Actions = {
   update: async ({ request }) => {
-    // Check demo mode - block modifications
     if (isDemoModeEnabled()) {
-      return fail(403, {
-        error: DEMO_MODE_MESSAGES.ADMIN_SAVE_DISABLED
-      });
+      return fail(403, { error: DEMO_MODE_MESSAGES.ADMIN_SAVE_DISABLED });
     }
 
     const data = await request.formData()
@@ -59,40 +67,27 @@ export const actions: Actions = {
     const fromEmail = data.get('fromEmail')?.toString()
     const fromName = data.get('fromName')?.toString()
 
-    // Basic validation - require essential fields
     if (!smtpHost || !smtpUser || !smtpPass) {
-      return fail(400, {
-        error: 'SMTP Host, Username, and Password are required'
-      })
+      return fail(400, { error: 'SMTP Host, Username, and Password are required' })
     }
 
-    // Validate port number if provided
     if (smtpPort && (isNaN(Number(smtpPort)) || Number(smtpPort) <= 0 || Number(smtpPort) > 65535)) {
-      return fail(400, {
-        error: 'SMTP Port must be a valid number between 1 and 65535'
-      })
+      return fail(400, { error: 'SMTP Port must be a valid number between 1 and 65535' })
     }
 
-    // Validate email format for fromEmail if provided
     if (fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
-      return fail(400, {
-        error: 'From Email must be a valid email address'
-      })
+      return fail(400, { error: 'From Email must be a valid email address' })
     }
 
     try {
-      // Get current values to compare and only save changed settings
       const currentSettings = await getMailingSettings();
 
-      // Helper function to check if value should be saved
       const shouldSaveValue = (newValue: string | undefined, currentValue: string | undefined) => {
-        // Only save if we have a non-empty new value that's different from current
         const trimmedNew = (newValue || '').trim();
         const trimmedCurrent = (currentValue || '').trim();
         return trimmedNew && trimmedNew !== trimmedCurrent;
       };
 
-      // Only save settings that have actually changed
       const settingsToSave = [];
 
       if (shouldSaveValue(smtpHost, currentSettings.smtp_host)) {
@@ -117,30 +112,61 @@ export const actions: Actions = {
         settingsToSave.push({ key: 'from_name', value: fromName!.trim(), category: 'mailing', description: 'From display name' });
       }
 
-      // Only save if there are actual changes
       if (settingsToSave.length > 0) {
         await adminSettingsService.setSettings(settingsToSave);
       }
 
-      // Clear the settings cache to force refresh on next request
       settingsStore.clearCache();
-
-      // Reconfigure email service to use new settings
       await emailService.reconfigure();
 
-      console.log('Mailing settings saved successfully');
-
-      // Get updated settings to return current values
-      const updatedSettings = await getMailingSettings();
-
-      return {
-        success: true
-      }
+      return { success: true }
     } catch (error) {
       console.error('Error saving mailing settings:', error)
-      return fail(500, {
-        error: 'Failed to save mailing settings. Please try again.'
-      })
+      return fail(500, { error: 'Failed to save mailing settings. Please try again.' })
+    }
+  },
+
+  saveTemplate: async ({ request }) => {
+    if (isDemoModeEnabled()) {
+      return fail(403, { error: DEMO_MODE_MESSAGES.ADMIN_SAVE_DISABLED });
+    }
+
+    const data = await request.formData()
+    const templateName = data.get('templateName')?.toString()
+    const subject = data.get('subject')?.toString()
+    const html = data.get('html')?.toString()
+
+    if (!templateName || !subject || !html) {
+      return fail(400, { error: 'Template name, subject, and HTML content are required', templateError: true })
+    }
+
+    try {
+      await EmailTemplateService.saveTemplate(templateName, subject, html)
+      return { success: true, templateSaved: templateName }
+    } catch (error) {
+      console.error('Error saving email template:', error)
+      return fail(500, { error: 'Failed to save email template', templateError: true })
+    }
+  },
+
+  resetTemplate: async ({ request }) => {
+    if (isDemoModeEnabled()) {
+      return fail(403, { error: DEMO_MODE_MESSAGES.ADMIN_SAVE_DISABLED });
+    }
+
+    const data = await request.formData()
+    const templateName = data.get('templateName')?.toString()
+
+    if (!templateName) {
+      return fail(400, { error: 'Template name is required', templateError: true })
+    }
+
+    try {
+      await EmailTemplateService.resetTemplate(templateName)
+      return { success: true, templateReset: templateName }
+    } catch (error) {
+      console.error('Error resetting email template:', error)
+      return fail(500, { error: 'Failed to reset email template', templateError: true })
     }
   }
 }

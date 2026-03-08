@@ -7,14 +7,16 @@
   import * as Label from "$lib/components/ui/label/index.js";
   import * as Select from "$lib/components/ui/select/index.js";
   import { Separator } from "$lib/components/ui/separator/index.js";
-  import { EyeIcon, EyeOffIcon, MailIcon } from "$lib/icons/index.js";
+  import { Badge } from "$lib/components/ui/badge/index.js";
+  import { EyeIcon, EyeOffIcon, MailIcon, FileTextIcon, SettingsIcon, RotateCcwIcon, SaveIcon, EditIcon, XIcon } from "$lib/icons/index.js";
+  import { toast } from "svelte-sonner";
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
+  let activeTab = $state<'smtp' | 'templates'>('smtp');
   let loading = $state(false);
   let showPassword = $state(false);
 
-  // Individual reactive form variables - initialize from server-loaded settings
   let smtpHost = $state(data?.settings?.smtpHost || "");
   let smtpPort = $state(data?.settings?.smtpPort || "");
   let smtpSecure = $state(data?.settings?.smtpSecure || "false");
@@ -23,9 +25,7 @@
   let fromEmail = $state(data?.settings?.fromEmail || "");
   let fromName = $state(data?.settings?.fromName || "");
 
-  // State sync effect
   $effect(() => {
-    // Update reactive state when data changes (e.g., on page refresh or form reset)
     if (data?.settings && !form) {
       smtpHost = data.settings.smtpHost || "";
       smtpPort = data.settings.smtpPort || "";
@@ -37,30 +37,88 @@
     }
   });
 
-  // Show success message for a few seconds
   let showSuccess = $state(false);
   $effect(() => {
-    if (form?.success) {
+    if (form?.success && !form?.templateSaved && !form?.templateReset) {
       showSuccess = true;
-      setTimeout(() => {
-        showSuccess = false;
-      }, 3000);
+      setTimeout(() => { showSuccess = false; }, 3000);
     }
   });
 
-  // Security options for the dropdown
   const securityOptions = [
     { value: "false", label: "No (STARTTLS)" },
     { value: "true", label: "Yes (SSL/TLS)" },
   ];
 
-  // Get selected security option
   const selectedSecurity = $derived(() => {
-    return (
-      securityOptions.find((opt) => opt.value === smtpSecure) ??
-      securityOptions[0]
-    );
+    return securityOptions.find((opt) => opt.value === smtpSecure) ?? securityOptions[0];
   });
+
+  let editingTemplate = $state<string | null>(null);
+  let editSubject = $state("");
+  let editHtml = $state("");
+  let defaultSubject = $state("");
+  let defaultHtml = $state("");
+  let templateLoading = $state(false);
+  let savingTemplate = $state(false);
+
+  async function loadTemplateForEdit(templateName: string) {
+    templateLoading = true;
+    try {
+      const res = await fetch(`/api/admin/email-template/${templateName}`);
+      if (!res.ok) {
+        toast.error('Failed to load template');
+        return;
+      }
+      const td = await res.json();
+      editingTemplate = templateName;
+      editSubject = td.subject;
+      editHtml = td.html;
+      defaultSubject = td.defaultSubject;
+      defaultHtml = td.defaultHtml;
+    } catch (e) {
+      toast.error('Failed to load template');
+    } finally {
+      templateLoading = false;
+    }
+  }
+
+  function closeEditor() {
+    editingTemplate = null;
+    editSubject = "";
+    editHtml = "";
+    defaultSubject = "";
+    defaultHtml = "";
+  }
+
+  function restoreDefault() {
+    editSubject = defaultSubject;
+    editHtml = defaultHtml;
+  }
+
+  $effect(() => {
+    if (form?.templateSaved) {
+      toast.success('Template saved successfully');
+      closeEditor();
+    }
+    if (form?.templateReset) {
+      toast.success('Template reset to default');
+      closeEditor();
+    }
+    if (form?.templateError) {
+      toast.error(form?.error || 'Template operation failed');
+    }
+  });
+
+  function getEditingLabel(): string {
+    const t = data.templates?.find((t: any) => t.name === editingTemplate);
+    return t?.label || editingTemplate || '';
+  }
+
+  function getEditingVars(): string[] {
+    const t = data.templates?.find((t: any) => t.name === editingTemplate);
+    return t?.variables || [];
+  }
 </script>
 
 <svelte:head>
@@ -68,7 +126,6 @@
 </svelte:head>
 
 <div class="space-y-4">
-  <!-- Demo Mode Banner -->
   {#if data.isDemoMode}
     <div class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-md">
       <div class="flex items-center gap-2">
@@ -79,273 +136,280 @@
         </div>
         <div>
           <p class="font-medium">Demo Mode Active</p>
-          <p class="text-sm">All modifications are disabled. This is a read-only demonstration of the admin interface.</p>
+          <p class="text-sm">All modifications are disabled.</p>
         </div>
       </div>
     </div>
   {/if}
 
-  <!-- Header -->
   <div>
     <h1 class="text-xl font-semibold tracking-tight flex items-center gap-2">
       <MailIcon class="w-6 h-6" />
       Mailing Settings
     </h1>
     <p class="text-muted-foreground">
-      Configure SMTP settings for automated system emails. These settings take
-      precedence over environment variables.
+      Configure SMTP settings and customize email templates.
     </p>
   </div>
 
-  <form
-    method="POST"
-    action="?/update"
-    use:enhance={() => {
-      loading = true;
-      return async ({ update }) => {
-        await update();
-        loading = false;
-      };
-    }}
-  >
-    <Card.Root>
-      <Card.Header>
-        <div class="flex items-center justify-between">
-          <div>
-            <Card.Title>SMTP Configuration</Card.Title>
-            <Card.Description>
-              Configure your SMTP server settings for sending transactional
-              emails such as welcome messages and password resets.
-            </Card.Description>
-          </div>
-        </div>
-      </Card.Header>
+  <div class="flex gap-1 border-b">
+    <button
+      class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {activeTab === 'smtp' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}"
+      onclick={() => { activeTab = 'smtp'; closeEditor(); }}
+    >
+      <span class="flex items-center gap-2">
+        <SettingsIcon class="w-4 h-4" />
+        SMTP Settings
+      </span>
+    </button>
+    <button
+      class="px-4 py-2 text-sm font-medium border-b-2 transition-colors {activeTab === 'templates' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}"
+      onclick={() => { activeTab = 'templates'; closeEditor(); }}
+    >
+      <span class="flex items-center gap-2">
+        <FileTextIcon class="w-4 h-4" />
+        Email Templates
+      </span>
+    </button>
+  </div>
 
-      <Card.Content class="space-y-6">
-        <div class="space-y-6">
-          <!-- SMTP Server Settings -->
-          <div class="space-y-4">
-            <div>
-              <h3 class="text-lg font-medium">Server Settings</h3>
-              <p class="text-sm text-muted-foreground">
-                Configure your SMTP server connection details.
-              </p>
-            </div>
+  {#if activeTab === 'smtp'}
+    <form
+      method="POST"
+      action="?/update"
+      use:enhance={() => {
+        loading = true;
+        return async ({ update }) => {
+          await update();
+          loading = false;
+        };
+      }}
+    >
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>SMTP Configuration</Card.Title>
+          <Card.Description>
+            Configure your SMTP server settings for sending transactional emails.
+          </Card.Description>
+        </Card.Header>
 
-            <div class="grid grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <Label.Root for="smtpHost">
-                  SMTP Host <span class="text-destructive">*</span>
-                </Label.Root>
-                <Input.Root
-                  id="smtpHost"
-                  name="smtpHost"
-                  type="text"
-                  placeholder="smtp.gmail.com"
-                  bind:value={smtpHost}
-                  disabled={data.isDemoMode}
-                  required
-                />
-                <p class="text-xs text-muted-foreground">
-                  Your SMTP server hostname (e.g., smtp.gmail.com,
-                  smtp.outlook.com)
-                </p>
+        <Card.Content class="space-y-6">
+          <div class="space-y-6">
+            <div class="space-y-4">
+              <div>
+                <h3 class="text-lg font-medium">Server Settings</h3>
+                <p class="text-sm text-muted-foreground">Configure your SMTP server connection details.</p>
               </div>
 
-              <div class="space-y-2">
-                <Label.Root for="smtpPort">SMTP Port</Label.Root>
-                <Input.Root
-                  id="smtpPort"
-                  name="smtpPort"
-                  type="number"
-                  placeholder="587"
-                  bind:value={smtpPort}
-                  disabled={data.isDemoMode}
-                  min="1"
-                  max="65535"
-                />
-                <p class="text-xs text-muted-foreground">
-                  Common ports: 587 (STARTTLS), 465 (SSL), 25 (insecure)
-                </p>
-              </div>
-            </div>
-
-            <div class="space-y-2">
-              <Label.Root for="smtpSecure">Security</Label.Root>
-              <Select.Root
-                type="single"
-                name="smtpSecure"
-                bind:value={smtpSecure}
-                disabled={data.isDemoMode}
-              >
-                <Select.Trigger>
-                  {selectedSecurity().label}
-                </Select.Trigger>
-                <Select.Content>
-                  {#each securityOptions as option}
-                    <Select.Item value={option.value} label={option.label}>
-                      {option.label}
-                    </Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-              <p class="text-xs text-muted-foreground">
-                Choose "Yes" for port 465, "No" for ports 587/25 with STARTTLS
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          <!-- Authentication -->
-          <div class="space-y-4">
-            <div>
-              <h3 class="text-lg font-medium">Authentication</h3>
-              <p class="text-sm text-muted-foreground">
-                Your SMTP server login credentials.
-              </p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <Label.Root for="smtpUser">
-                  Username <span class="text-destructive">*</span>
-                </Label.Root>
-                <Input.Root
-                  id="smtpUser"
-                  name="smtpUser"
-                  type="text"
-                  placeholder="your-email@example.com"
-                  bind:value={smtpUser}
-                  disabled={data.isDemoMode}
-                  required
-                />
-                <p class="text-xs text-muted-foreground">
-                  Usually your email address
-                </p>
-              </div>
-
-              <div class="space-y-2">
-                <Label.Root for="smtpPass">
-                  Password <span class="text-destructive">*</span>
-                </Label.Root>
-                <div class="relative">
-                  <Input.Root
-                    id="smtpPass"
-                    name="smtpPass"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Your SMTP password"
-                    bind:value={smtpPass}
-                    disabled={data.isDemoMode}
-                    required
-                    class="pr-10"
-                  />
-                  <Button.Root
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    class="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onclick={() => (showPassword = !showPassword)}
-                    disabled={data.isDemoMode}
-                  >
-                    {#if showPassword}
-                      <EyeOffIcon class="h-4 w-4" />
-                    {:else}
-                      <EyeIcon class="h-4 w-4" />
-                    {/if}
-                    <span class="sr-only">
-                      {showPassword ? "Hide" : "Show"} password
-                    </span>
-                  </Button.Root>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                  <Label.Root for="smtpHost">SMTP Host <span class="text-destructive">*</span></Label.Root>
+                  <Input.Root id="smtpHost" name="smtpHost" type="text" placeholder="smtp.gmail.com" bind:value={smtpHost} disabled={data.isDemoMode} required />
+                  <p class="text-xs text-muted-foreground">Your SMTP server hostname</p>
                 </div>
-                <p class="text-xs text-muted-foreground">
-                  Use an app password for Gmail/Outlook. Stored encrypted.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
-          <!-- Email Identity -->
-          <div class="space-y-4">
-            <div>
-              <h3 class="text-lg font-medium">Email Identity</h3>
-              <p class="text-sm text-muted-foreground">
-                How emails will appear to recipients.
-              </p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="space-y-2">
-                <Label.Root for="fromEmail">From Email</Label.Root>
-                <Input.Root
-                  id="fromEmail"
-                  name="fromEmail"
-                  type="email"
-                  placeholder="noreply@yoursite.com"
-                  bind:value={fromEmail}
-                  disabled={data.isDemoMode}
-                />
-                <p class="text-xs text-muted-foreground">
-                  Leave empty to use SMTP username
-                </p>
+                <div class="space-y-2">
+                  <Label.Root for="smtpPort">SMTP Port</Label.Root>
+                  <Input.Root id="smtpPort" name="smtpPort" type="number" placeholder="587" bind:value={smtpPort} disabled={data.isDemoMode} min="1" max="65535" />
+                  <p class="text-xs text-muted-foreground">Common: 587 (STARTTLS), 465 (SSL)</p>
+                </div>
               </div>
 
               <div class="space-y-2">
-                <Label.Root for="fromName">From Name</Label.Root>
-                <Input.Root
-                  id="fromName"
-                  name="fromName"
-                  type="text"
-                  placeholder="Your Company Name"
-                  bind:value={fromName}
-                  disabled={data.isDemoMode}
-                />
-                <p class="text-xs text-muted-foreground">
-                  Display name for outgoing emails
-                </p>
+                <Label.Root for="smtpSecure">Security</Label.Root>
+                <Select.Root type="single" name="smtpSecure" bind:value={smtpSecure} disabled={data.isDemoMode}>
+                  <Select.Trigger>{selectedSecurity().label}</Select.Trigger>
+                  <Select.Content>
+                    {#each securityOptions as option}
+                      <Select.Item value={option.value} label={option.label}>{option.label}</Select.Item>
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
               </div>
             </div>
-          </div>
 
-          <!-- Error Display -->
-          {#if form?.error}
-            <div class="rounded-md bg-destructive/15 p-3">
-              <div class="flex">
-                <div class="text-sm text-destructive">
-                  {form.error}
+            <Separator />
+
+            <div class="space-y-4">
+              <div>
+                <h3 class="text-lg font-medium">Authentication</h3>
+                <p class="text-sm text-muted-foreground">Your SMTP server login credentials.</p>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                  <Label.Root for="smtpUser">Username <span class="text-destructive">*</span></Label.Root>
+                  <Input.Root id="smtpUser" name="smtpUser" type="text" placeholder="your-email@example.com" bind:value={smtpUser} disabled={data.isDemoMode} required />
+                </div>
+                <div class="space-y-2">
+                  <Label.Root for="smtpPass">Password <span class="text-destructive">*</span></Label.Root>
+                  <div class="relative">
+                    <Input.Root id="smtpPass" name="smtpPass" type={showPassword ? "text" : "password"} placeholder="Your SMTP password" bind:value={smtpPass} disabled={data.isDemoMode} required class="pr-10" />
+                    <Button.Root type="button" variant="ghost" size="icon" class="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onclick={() => (showPassword = !showPassword)} disabled={data.isDemoMode}>
+                      {#if showPassword}
+                        <EyeOffIcon class="h-4 w-4" />
+                      {:else}
+                        <EyeIcon class="h-4 w-4" />
+                      {/if}
+                    </Button.Root>
+                  </div>
+                  <p class="text-xs text-muted-foreground">Stored encrypted</p>
                 </div>
               </div>
             </div>
-          {/if}
 
-          <!-- Success Display -->
-          {#if showSuccess}
-            <div class="rounded-md bg-green-50 dark:bg-green-950/50 p-3">
-              <div class="flex">
-                <div class="text-sm text-green-700 dark:text-green-400">
-                  Mailing settings saved successfully!
+            <Separator />
+
+            <div class="space-y-4">
+              <div>
+                <h3 class="text-lg font-medium">Email Identity</h3>
+                <p class="text-sm text-muted-foreground">How emails will appear to recipients.</p>
+              </div>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                  <Label.Root for="fromEmail">From Email</Label.Root>
+                  <Input.Root id="fromEmail" name="fromEmail" type="email" placeholder="noreply@yoursite.com" bind:value={fromEmail} disabled={data.isDemoMode} />
+                </div>
+                <div class="space-y-2">
+                  <Label.Root for="fromName">From Name</Label.Root>
+                  <Input.Root id="fromName" name="fromName" type="text" placeholder="Your Company Name" bind:value={fromName} disabled={data.isDemoMode} />
                 </div>
               </div>
             </div>
-          {/if}
-        </div>
-      </Card.Content>
-    </Card.Root>
 
-    <!-- Button positioned outside the card -->
-    <div class="mt-4 space-y-2">
-      <div class="flex justify-end">
+            {#if form?.error && !form?.templateError}
+              <div class="rounded-md bg-destructive/15 p-3">
+                <p class="text-sm text-destructive">{form.error}</p>
+              </div>
+            {/if}
+
+            {#if showSuccess}
+              <div class="rounded-md bg-green-50 dark:bg-green-950/50 p-3">
+                <p class="text-sm text-green-700 dark:text-green-400">Mailing settings saved successfully!</p>
+              </div>
+            {/if}
+          </div>
+        </Card.Content>
+      </Card.Root>
+
+      <div class="mt-4 flex justify-end">
         <Button.Root type="submit" disabled={loading || data.isDemoMode}>
           {loading ? "Saving..." : data.isDemoMode ? "Demo Mode - Read Only" : "Save Mailing Settings"}
         </Button.Root>
       </div>
-      {#if data.isDemoMode}
-        <p class="text-xs text-muted-foreground text-right">
-          Saving is disabled in demo mode. This is a read-only demonstration.
-        </p>
-      {/if}
-    </div>
-  </form>
+    </form>
+  {:else}
+    {#if editingTemplate}
+      <Card.Root>
+        <Card.Header>
+          <div class="flex items-center justify-between">
+            <div>
+              <Card.Title>Edit: {getEditingLabel()}</Card.Title>
+              <Card.Description>Customize the email subject and HTML body. Use {'{{variableName}}'} placeholders.</Card.Description>
+            </div>
+            <Button.Root variant="ghost" size="icon" onclick={closeEditor}>
+              <XIcon class="w-5 h-5" />
+            </Button.Root>
+          </div>
+        </Card.Header>
+        <Card.Content class="space-y-4">
+          <div class="space-y-2">
+            <Label.Root for="editSubject">Subject Line</Label.Root>
+            <Input.Root id="editSubject" type="text" bind:value={editSubject} placeholder="Email subject..." />
+          </div>
+
+          <div class="space-y-2">
+            <Label.Root for="editHtml">HTML Body</Label.Root>
+            <textarea
+              id="editHtml"
+              bind:value={editHtml}
+              class="w-full min-h-[400px] rounded-md border bg-transparent px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Email HTML content..."
+            ></textarea>
+          </div>
+
+          <div class="rounded-md border p-3">
+            <p class="text-sm font-medium mb-2">Available Variables</p>
+            <div class="flex flex-wrap gap-1.5">
+              {#each getEditingVars() as v}
+                <Badge variant="secondary" class="font-mono text-xs">{`{{${v}}}`}</Badge>
+              {/each}
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <div class="flex gap-2">
+              <Button.Root variant="outline" size="sm" onclick={restoreDefault}>
+                <RotateCcwIcon class="w-4 h-4 mr-1" />
+                Restore Default
+              </Button.Root>
+              <form method="POST" action="?/resetTemplate" use:enhance={() => {
+                return async ({ update }) => { await update(); };
+              }}>
+                <input type="hidden" name="templateName" value={editingTemplate} />
+                <Button.Root type="submit" variant="outline" size="sm" disabled={data.isDemoMode}>
+                  <RotateCcwIcon class="w-4 h-4 mr-1" />
+                  Reset to Default (Save)
+                </Button.Root>
+              </form>
+            </div>
+            <form method="POST" action="?/saveTemplate" use:enhance={() => {
+              savingTemplate = true;
+              return async ({ update }) => {
+                await update();
+                savingTemplate = false;
+              };
+            }}>
+              <input type="hidden" name="templateName" value={editingTemplate} />
+              <input type="hidden" name="subject" value={editSubject} />
+              <input type="hidden" name="html" value={editHtml} />
+              <Button.Root type="submit" disabled={savingTemplate || data.isDemoMode}>
+                <SaveIcon class="w-4 h-4 mr-1" />
+                {savingTemplate ? 'Saving...' : 'Save Template'}
+              </Button.Root>
+            </form>
+          </div>
+        </Card.Content>
+      </Card.Root>
+    {:else}
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>Email Templates</Card.Title>
+          <Card.Description>Customize the look and content of all system emails. Click edit to modify a template.</Card.Description>
+        </Card.Header>
+        <Card.Content>
+          <div class="space-y-2">
+            {#each data.templates || [] as template}
+              <div class="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <p class="font-medium text-sm">{template.label}</p>
+                    {#if template.isCustom}
+                      <Badge variant="default" class="text-xs">Customized</Badge>
+                    {:else}
+                      <Badge variant="secondary" class="text-xs">Default</Badge>
+                    {/if}
+                  </div>
+                  <p class="text-xs text-muted-foreground mt-0.5 truncate">{template.description}</p>
+                  <p class="text-xs text-muted-foreground mt-0.5 font-mono truncate">Subject: {template.subject}</p>
+                </div>
+                <Button.Root
+                  variant="outline"
+                  size="sm"
+                  class="ml-3 flex-shrink-0"
+                  disabled={templateLoading}
+                  onclick={() => loadTemplateForEdit(template.name)}
+                >
+                  <EditIcon class="w-4 h-4 mr-1" />
+                  Edit
+                </Button.Root>
+              </div>
+            {/each}
+
+            {#if !data.templates || data.templates.length === 0}
+              <p class="text-center text-muted-foreground py-8">No email templates found.</p>
+            {/if}
+          </div>
+        </Card.Content>
+      </Card.Root>
+    {/if}
+  {/if}
 </div>

@@ -125,3 +125,7 @@ export { default as ArrowRightLeftIcon } from "@lucide/svelte/icons/arrow-right-
 // Projects page icons
 export { default as FolderOpenIcon } from "@lucide/svelte/icons/folder-open";
 export { default as MessageSquareIcon } from "@lucide/svelte/icons/message-square";
+
+// Email template icons
+export { default as EditIcon } from "@lucide/svelte/icons/edit";
+export { default as RotateCcwIcon } from "@lucide/svelte/icons/rotate-ccw";

@@ -85,6 +85,19 @@ src/
 - Key files: `src/lib/server/credit-service.ts`, `src/routes/api/credits/purchase/+server.ts`
 - Pricing pages show feature names without exact limit numbers; usage page shows actual counts
 
+## Email Template System
+
+- Admin-editable HTML email templates for all system emails
+- 8 templates total: welcome/verify, reset password, OTP verification, plan purchase, credit purchase, subscription expiry, plan upgrade, general notice
+- Templates stored in `admin_settings` table (category: `email_templates`, key: `email_template_{name}`)
+- DB value is JSON `{subject, html}`; falls back to filesystem HTML files in `sys-email-templates/` if not customized
+- `EmailTemplateService` in `src/lib/server/email-templates.ts`: getTemplate, saveTemplate, resetTemplate, getTemplateList, getDefaultTemplate
+- `EmailService` extended with 6 new send methods: sendOtpEmail, sendPlanPurchaseEmail, sendCreditPurchaseEmail, sendExpiryWarningEmail, sendPlanUpgradeEmail, sendNoticeEmail
+- Admin UI at `/admin/settings/mailing` has two tabs: "SMTP Settings" and "Email Templates"
+- Template editor supports subject editing, HTML editing, variable reference, restore default, and reset
+- API endpoint: `GET /api/admin/email-template/[name]` loads full template data for the editor
+- Key files: `src/lib/server/email-templates.ts`, `src/lib/server/email.ts`, `src/routes/admin/settings/mailing/`
+
 ## Backups
 
 - `opaybd-backup/` - Archived Opaybd payment integration files for reference

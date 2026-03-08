@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credits Added - {{platformName}}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #171717;
+            background-color: #fafafa;
+            -webkit-text-size-adjust: 100%;
+        }
+        .wrapper {
+            background-color: #fafafa;
+            padding: 48px 0;
+        }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #e5e5e5;
+        }
+        .header {
+            padding: 32px 40px 0 40px;
+        }
+        .content {
+            padding: 32px 40px 40px 40px;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #171717;
+            letter-spacing: -0.025em;
+            margin: 0 0 24px 0;
+        }
+        p {
+            font-size: 15px;
+            color: #525252;
+            margin: 0 0 16px 0;
+        }
+        .order-details {
+            background-color: #fafaf9;
+            border: 1px solid #e5e5e5;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        .order-details table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .order-details td {
+            padding: 6px 0;
+            font-size: 14px;
+            color: #525252;
+        }
+        .order-details td:last-child {
+            text-align: right;
+            font-weight: 600;
+            color: #171717;
+        }
+        .button {
+            display: inline-block;
+            background-color: #171717;
+            color: #ffffff;
+            padding: 12px 24px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            margin: 8px 0 0 0;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e5e5e5;
+            margin: 32px 0 0 0;
+        }
+        .footer {
+            padding: 24px 40px 32px 40px;
+        }
+        .footer p {
+            font-size: 13px;
+            color: #a3a3a3;
+            margin: 0 0 4px 0;
+        }
+        .footer a {
+            color: #a3a3a3;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="header">
+                <a href="{{publicOrigin}}" style="text-decoration: none; display: block;">
+                    <img src="{{logoUrl}}" alt="{{platformName}}" width="{{logoWidth}}" height="{{logoHeight}}" style="display: block; margin: 0 auto; max-width: 100%; height: auto;" />
+                </a>
+            </div>
+
+            <div class="content">
+                <h1>Credits Added</h1>
+
+                <p>Hi {{displayName}},</p>
+
+                <p>Your credit purchase has been confirmed. The credits have been added to your account and are ready to use.</p>
+
+                <div class="order-details">
+                    <table>
+                        <tr>
+                            <td>Credit Pack</td>
+                            <td>{{creditPackName}}</td>
+                        </tr>
+                        <tr>
+                            <td>Credits</td>
+                            <td>{{creditAmount}} {{creditType}}</td>
+                        </tr>
+                        <tr>
+                            <td>Amount Paid</td>
+                            <td>{{amount}}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <p>These credits will be used automatically when your plan limit is reached.</p>
+
+                <a href="{{publicOrigin}}/settings/billing" class="button" style="color: #ffffff;">View Credits</a>
+
+                <div class="divider"></div>
+            </div>
+
+            <div class="footer">
+                <p>{{platformName}}</p>
+                <p>Questions? Contact our <a href="{{publicOrigin}}">support team</a>.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

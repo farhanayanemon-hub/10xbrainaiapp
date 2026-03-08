@@ -4,6 +4,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { getMailingSettings } from './admin-settings'
 import { getPublicOrigin, getLogoUrlLight, getLogoWidth, getLogoHeight, getSiteName } from './settings-store'
+import { EmailTemplateService } from './email-templates.js'
 
 // Email configuration types
 /**
@@ -525,6 +526,111 @@ ${publicOrigin}
     })
   }
 
+  private async getCommonVars() {
+    const smtpConfig = await this.getSmtpConfig()
+    const platformName = smtpConfig.fromName || await getSiteName()
+    const publicOrigin = await getPublicOrigin()
+    const logoUrlLight = await getLogoUrlLight()
+    const logoWidth = await getLogoWidth()
+    const logoHeight = await getLogoHeight()
+    const logoUrl = logoUrlLight.startsWith('http') ? logoUrlLight : `${publicOrigin}${logoUrlLight}`
+    return { platformName, publicOrigin, logoUrl, logoWidth, logoHeight }
+  }
+
+  private async sendTemplatedEmail(
+    templateName: string,
+    to: string,
+    variables: Record<string, any>,
+    subjectOverride?: string
+  ): Promise<boolean> {
+    const template = await EmailTemplateService.getTemplate(templateName)
+    if (!template) {
+      console.error(`[Email Service] Template not found: ${templateName}`)
+      return false
+    }
+
+    const common = await this.getCommonVars()
+    const allVars = { ...common, ...variables }
+
+    let subject = subjectOverride || template.subject
+    Object.entries(allVars).forEach(([key, value]) => {
+      subject = subject.replace(new RegExp(`{{${key}}}`, 'g'), String(value || ''))
+    })
+
+    const html = processEmailTemplate(template.html, allVars)
+    const text = subject
+
+    return await this.sendEmail({ to, subject, html, text })
+  }
+
+  async sendOtpEmail(data: { email: string; name?: string; otpCode: string; expiryMinutes?: number }): Promise<boolean> {
+    return this.sendTemplatedEmail('otp-verification', data.email, {
+      displayName: data.name || data.email.split('@')[0],
+      otpCode: data.otpCode,
+      expiryMinutes: data.expiryMinutes || 10,
+    })
+  }
+
+  async sendPlanPurchaseEmail(data: {
+    email: string; name?: string; planName: string; amount: string; billingPeriod: string; nextBillingDate: string
+  }): Promise<boolean> {
+    return this.sendTemplatedEmail('plan-purchase', data.email, {
+      displayName: data.name || data.email.split('@')[0],
+      planName: data.planName,
+      amount: data.amount,
+      billingPeriod: data.billingPeriod,
+      nextBillingDate: data.nextBillingDate,
+    })
+  }
+
+  async sendCreditPurchaseEmail(data: {
+    email: string; name?: string; creditPackName: string; creditAmount: number; creditType: string; amount: string
+  }): Promise<boolean> {
+    return this.sendTemplatedEmail('credit-purchase', data.email, {
+      displayName: data.name || data.email.split('@')[0],
+      creditPackName: data.creditPackName,
+      creditAmount: data.creditAmount,
+      creditType: data.creditType,
+      amount: data.amount,
+    })
+  }
+
+  async sendExpiryWarningEmail(data: {
+    email: string; name?: string; planName: string; expiryDate: string; daysRemaining: number
+  }): Promise<boolean> {
+    return this.sendTemplatedEmail('subscription-expiry', data.email, {
+      displayName: data.name || data.email.split('@')[0],
+      planName: data.planName,
+      expiryDate: data.expiryDate,
+      daysRemaining: data.daysRemaining,
+    })
+  }
+
+  async sendPlanUpgradeEmail(data: {
+    email: string; name?: string; previousPlan: string; newPlan: string; amount: string; effectiveDate: string
+  }): Promise<boolean> {
+    return this.sendTemplatedEmail('plan-upgrade', data.email, {
+      displayName: data.name || data.email.split('@')[0],
+      previousPlan: data.previousPlan,
+      newPlan: data.newPlan,
+      amount: data.amount,
+      effectiveDate: data.effectiveDate,
+    })
+  }
+
+  async sendNoticeEmail(data: {
+    email: string; name?: string; heading: string; message: string; subject?: string; actionUrl?: string; actionText?: string
+  }): Promise<boolean> {
+    return this.sendTemplatedEmail('general-notice', data.email, {
+      displayName: data.name || data.email.split('@')[0],
+      heading: data.heading,
+      message: data.message,
+      subject: data.subject || data.heading,
+      actionUrl: data.actionUrl || '',
+      actionText: data.actionText || 'Learn More',
+    }, data.subject ? `${data.subject}` : undefined)
+  }
+
   /**
    * Reconfigure the email service when settings change
    * This method should be called when admin settings are updated
@@ -553,3 +659,9 @@ export const emailService = new EmailService()
 export const sendWelcomeEmail = (userData: WelcomeEmailData) => emailService.sendWelcomeEmail(userData)
 export const sendPasswordResetEmail = (userData: PasswordResetEmailData) => emailService.sendPasswordResetEmail(userData)
 export const testEmailConnection = () => emailService.testConnection()
+export const sendOtpEmail = (data: Parameters<typeof emailService.sendOtpEmail>[0]) => emailService.sendOtpEmail(data)
+export const sendPlanPurchaseEmail = (data: Parameters<typeof emailService.sendPlanPurchaseEmail>[0]) => emailService.sendPlanPurchaseEmail(data)
+export const sendCreditPurchaseEmail = (data: Parameters<typeof emailService.sendCreditPurchaseEmail>[0]) => emailService.sendCreditPurchaseEmail(data)
+export const sendExpiryWarningEmail = (data: Parameters<typeof emailService.sendExpiryWarningEmail>[0]) => emailService.sendExpiryWarningEmail(data)
+export const sendPlanUpgradeEmail = (data: Parameters<typeof emailService.sendPlanUpgradeEmail>[0]) => emailService.sendPlanUpgradeEmail(data)
+export const sendNoticeEmail = (data: Parameters<typeof emailService.sendNoticeEmail>[0]) => emailService.sendNoticeEmail(data)
