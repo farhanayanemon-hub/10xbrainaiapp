@@ -56,30 +56,35 @@ async function buildProjectSystemMessage(projectId: string, userId: string): Pro
 }
 
 async function buildUserPersonalization(userId: string): Promise<string> {
-        const [user] = await db
-                .select({
-                        name: users.name,
-                        profession: users.profession,
-                        personalInstructions: users.personalInstructions,
-                })
-                .from(users)
-                .where(eq(users.id, userId));
+        try {
+                const [user] = await db
+                        .select({
+                                name: users.name,
+                                profession: users.profession,
+                                personalInstructions: users.personalInstructions,
+                        })
+                        .from(users)
+                        .where(eq(users.id, userId));
 
-        if (!user) return '';
+                if (!user) return '';
 
-        const parts: string[] = [];
+                const parts: string[] = [];
 
-        if (user.name || user.profession) {
-                parts.push('## About the User');
-                if (user.name) parts.push(`- Name: ${user.name}`);
-                if (user.profession) parts.push(`- Profession: ${user.profession}`);
+                if (user.name || user.profession) {
+                        parts.push('## About the User');
+                        if (user.name) parts.push(`- Name: ${user.name}`);
+                        if (user.profession) parts.push(`- Profession: ${user.profession}`);
+                }
+
+                if (user.personalInstructions) {
+                        parts.push(`\n## User's Custom Instructions\n${user.personalInstructions}`);
+                }
+
+                return parts.join('\n');
+        } catch (e) {
+                console.warn('[Personalization] Could not load user personalization:', (e as Error).message);
+                return '';
         }
-
-        if (user.personalInstructions) {
-                parts.push(`\n## User's Custom Instructions\n${user.personalInstructions}`);
-        }
-
-        return parts.join('\n');
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
