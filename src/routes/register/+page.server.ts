@@ -6,8 +6,8 @@ import { eq } from "drizzle-orm"
 import { isOAuthProviderEnabled } from '$lib/server/auth-config'
 import { verifyTurnstileToken, isTurnstileEnabled, getTurnstileErrorMessage } from '$lib/server/turnstile'
 import { getTurnstileSiteKey } from '$lib/server/settings-store'
-import { sendWelcomeEmail } from '$lib/server/email.js'
-import { createVerificationToken, generateVerificationUrl } from '$lib/server/email-verification.js'
+import { sendOtpEmail } from '$lib/server/email.js'
+import { OtpService } from '$lib/server/otp-service.js'
 import { env } from '$env/dynamic/private'
 import { authSanitizers, validatePasswordSafety } from '$lib/utils/sanitization.js'
 import { validatePassword, BALANCED_PASSWORD_POLICY } from '$lib/utils/password-validation.js'
@@ -134,8 +134,22 @@ export const actions: Actions = {
       const existingUser = await db.select().from(users).where(eq(users.email, validatedEmail)).limit(1)
 
       if (existingUser.length > 0) {
+        const existing = existingUser[0]
+        if (!existing.emailVerified) {
+          try {
+            const otpCode = await OtpService.createOtp(validatedEmail, 'registration')
+            await sendOtpEmail({
+              email: validatedEmail,
+              name: existing.name || validatedEmail.split('@')[0],
+              otpCode,
+              expiryMinutes: OtpService.getExpiryMinutes(),
+            })
+          } catch (e) {
+            console.error('[Registration] Failed to resend OTP for unverified user:', e)
+          }
+          throw redirect(302, `/verify-otp?email=${encodeURIComponent(validatedEmail)}`)
+        }
         SecurityLogger.registrationFailure(validatedEmail, 'Account already exists', clientIP);
-        // Inform user that email already exists and suggest login
         return createAuthError(AUTH_STATUS_CODES.BAD_REQUEST, AUTH_ERRORS.EMAIL_ALREADY_EXISTS);
       }
       
@@ -150,33 +164,28 @@ export const actions: Actions = {
         planTier: 'free', // Set new users to free plan by default
       }).returning({ id: users.id, email: users.email, name: users.name })
       
-      // Log successful registration
       if (newUser.length > 0) {
         const userData = newUser[0]
         SecurityLogger.registrationSuccess(userData.id, userData.email!, clientIP);
 
         try {
-          // Create verification token for email/password registration
-          const { token } = await createVerificationToken(userData.email!)
-          const verificationUrl = await generateVerificationUrl(token)
+          const otpCode = await OtpService.createOtp(userData.email!, 'registration')
 
-          // Send welcome email with verification link
-          await sendWelcomeEmail({
+          await sendOtpEmail({
             email: userData.email!,
             name: userData.name || userData.email!.split('@')[0],
-            verificationUrl
+            otpCode,
+            expiryMinutes: OtpService.getExpiryMinutes(),
           })
           SecurityLogger.emailVerificationSent(userData.email!, userData.id);
-          console.log(`[Registration] Welcome email with verification link sent`)
+          console.log(`[Registration] OTP verification email sent`)
         } catch (emailError) {
-          // Log error but don't fail registration
-          console.error(`[Registration] Failed to send welcome email:`, emailError)
-          SecurityLogger.emailVerificationFailure(userData.email!, 'Failed to send welcome email');
+          console.error(`[Registration] Failed to send OTP email:`, emailError)
+          SecurityLogger.emailVerificationFailure(userData.email!, 'Failed to send OTP email');
         }
       }
       
-      // Redirect to login with success message
-      throw redirect(302, '/login?message=Account created successfully. Please sign in.')
+      throw redirect(302, `/verify-otp?email=${encodeURIComponent(validatedEmail)}`)
       
     } catch (error) {
       // Re-throw redirects (SvelteKit redirects have a status property)

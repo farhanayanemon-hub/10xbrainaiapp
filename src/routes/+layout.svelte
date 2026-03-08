@@ -34,7 +34,7 @@
 
   // Check if current route is a fully standalone page (no header, no sidebar)
   const isStandalonePage = $derived(
-    page.url.pathname === "/" || page.url.pathname === "/login" || page.url.pathname === "/register" || page.url.pathname === "/pricing" || page.url.pathname === "/terms" || page.url.pathname === "/privacy" || page.url.pathname.startsWith("/admin") || page.url.pathname === "/reset-password" || page.url.pathname.startsWith("/reset-password/") || page.url.pathname === "/verify-email" || page.url.pathname.startsWith("/verify-email/")
+    page.url.pathname === "/" || page.url.pathname === "/login" || page.url.pathname === "/register" || page.url.pathname === "/pricing" || page.url.pathname === "/terms" || page.url.pathname === "/privacy" || page.url.pathname.startsWith("/admin") || page.url.pathname === "/reset-password" || page.url.pathname.startsWith("/reset-password/") || page.url.pathname === "/verify-email" || page.url.pathname.startsWith("/verify-email/") || page.url.pathname === "/verify-otp"
   );
 
   // Check if current route should have header but no sidebar

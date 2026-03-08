@@ -66,6 +66,11 @@ async function buildProviders(): Promise<Provider[]> {
           return null
         }
 
+        if (!user[0].emailVerified) {
+          SecurityLogger.loginFailure(sanitizedEmail, 'Email not verified');
+          return null
+        }
+
         // Log successful credential validation
         SecurityLogger.loginSuccess(user[0].id, user[0].email || '');
 
@@ -439,6 +444,11 @@ async function createDefaultConfig() {
 
           if (!isPasswordValid) {
             SecurityLogger.loginFailure(sanitizedEmail, 'Invalid password (fallback)');
+            return null
+          }
+
+          if (!user[0].emailVerified) {
+            SecurityLogger.loginFailure(sanitizedEmail, 'Email not verified (fallback)');
             return null
           }
 

@@ -98,6 +98,18 @@ src/
 - API endpoint: `GET /api/admin/email-template/[name]` loads full template data for the editor
 - Key files: `src/lib/server/email-templates.ts`, `src/lib/server/email.ts`, `src/routes/admin/settings/mailing/`
 
+## OTP Email Verification (Registration)
+
+- New users must verify email via 6-digit OTP code before they can log in
+- Registration flow: fill form → create user (unverified) → send OTP email → redirect to `/verify-otp?email=...` → enter code → email verified → redirect to login
+- If an unverified user tries to register again, a new OTP is sent and they're redirected to verify
+- DB table: `otp_code` (id, email, code, purpose, attempts, max_attempts, expires, verified, created_at)
+- `OtpService` in `src/lib/server/otp-service.ts`: createOtp, verifyOtp, cleanupExpired
+- OTP codes expire after 10 minutes, max 5 attempts per code
+- Uses `sendOtpEmail` from email service with the `otp-verification` template
+- `/verify-otp` page is standalone (no sidebar) — added to `isStandalonePage` in root layout
+- Key files: `src/lib/server/otp-service.ts`, `src/routes/verify-otp/`, `src/routes/register/+page.server.ts`
+
 ## Backups
 
 - `opaybd-backup/` - Archived Opaybd payment integration files for reference

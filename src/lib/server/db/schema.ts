@@ -103,6 +103,21 @@ export const passwordResetTokens = pgTable(
         ]
 )
 
+export const otpCodes = pgTable(
+        "otp_code",
+        {
+                id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+                email: text("email").notNull(),
+                code: text("code").notNull(),
+                purpose: text("purpose").notNull().default("registration"),
+                attempts: integer("attempts").notNull().default(0),
+                maxAttempts: integer("max_attempts").notNull().default(5),
+                expires: timestamp("expires", { mode: "date" }).notNull(),
+                verified: boolean("verified").notNull().default(false),
+                createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+        }
+)
+
 export const authenticators = pgTable(
         "authenticator",
         {
