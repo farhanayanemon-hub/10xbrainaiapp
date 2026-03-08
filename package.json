@@ -62,6 +62,7 @@
 		"@aws-sdk/s3-request-presigner": "^3.873.0",
 		"@elevenlabs/elevenlabs-js": "^2.25.0",
 		"@stripe/stripe-js": "^7.8.0",
+		"adm-zip": "^0.5.16",
 		"bcryptjs": "^3.0.2",
 		"d3-scale": "^4.0.2",
 		"d3-shape": "^3.2.0",
