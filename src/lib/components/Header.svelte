@@ -100,10 +100,10 @@
     {#if session?.user}
       {#if session.user.planTier === "free"}
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
           onclick={() => goto("/pricing")}
-          class="cursor-pointer"
+          class="cursor-pointer btn-gradient-outline rounded-full text-xs"
         >
           <UpgradeIcon class="w-4 h-4" />
           {m["auth.upgrade_plan"]()}

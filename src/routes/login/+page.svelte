@@ -342,7 +342,7 @@
       <Button
         onclick={handleSignIn}
         disabled={loading || !email || !password}
-        class="w-full cursor-pointer"
+        class="w-full cursor-pointer btn-gradient rounded-lg"
       >
         {loading ? "Logging in..." : "Log in"}
       </Button>

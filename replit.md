@@ -148,6 +148,15 @@ src/
 - DB columns: `profession text` and `personalInstructions text` on `user` table
 - Key files: `src/routes/settings/ai-personalization/`, `src/routes/api/chat-stream/+server.ts` (buildUserPersonalization function)
 
+## Theme & Design System
+
+- Blue-to-purple gradient theme matching the logo (indigo #6366f1 to purple #a855f7)
+- CSS variables for gradients: `--gradient-start`, `--gradient-mid`, `--gradient-end` (different values for light/dark)
+- Theme colors use OKLCH color space with hue ~270 (blue-purple range) for both light and dark modes
+- Utility classes: `.btn-gradient` (filled gradient button with glow + hover shimmer), `.btn-gradient-outline` (outlined → fills on hover), `.text-gradient` (gradient text), `.glow-gradient` / `.glow-gradient-hover` (box-shadow glow), `.border-gradient` (gradient border via CSS masks)
+- All primary CTA buttons (landing, login, register, pricing) use `btn-gradient`
+- Pricing toggle/badge use indigo-purple gradients; feature cards have blue-purple gradient icons
+
 ## Backups
 
 - `opaybd-backup/` - Archived Opaybd payment integration files for reference

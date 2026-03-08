@@ -315,7 +315,7 @@
           </div>
         {/if}
 
-        <Button type="submit" disabled={loading} class="w-full cursor-pointer">
+        <Button type="submit" disabled={loading} class="w-full cursor-pointer btn-gradient rounded-lg">
           {loading ? "Creating account..." : "Create your account"}
         </Button>
 

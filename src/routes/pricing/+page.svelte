@@ -331,9 +331,9 @@
   <!-- Billing Toggle -->
   <div class="flex flex-col items-center mb-5">
     <Badge
-      class="mb-5 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-3 py-1 text-sm font-semibold animate-pulse"
+      class="mb-5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1 text-sm font-semibold animate-pulse"
     >
-      💰 Save 20% with a Yearly plan
+      Save 20% with a Yearly plan
     </Badge>
     <div
       class="bg-white/80 dark:bg-black/40 backdrop-blur-sm border border-white/20 dark:border-white/10 rounded-xl p-1 inline-flex items-center gap-2 shadow-sm"
@@ -341,7 +341,7 @@
       <span
         class={`cursor-default px-4 py-3 text-sm font-semibold transition-all duration-300 rounded-lg ${
           !isYearly
-            ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md"
+            ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
             : "text-muted-foreground hover:text-foreground"
         }`}
       >
@@ -349,12 +349,12 @@
       </span>
       <Switch
         bind:checked={isYearly}
-        class="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-green-500 data-[state=checked]:to-emerald-500 cursor-pointer mx-2"
+        class="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-indigo-500 data-[state=checked]:to-purple-500 cursor-pointer mx-2"
       />
       <span
         class={`cursor-default px-4 py-3 text-sm font-semibold transition-all duration-300 rounded-lg ${
           isYearly
-            ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-md"
+            ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md"
             : "text-muted-foreground hover:text-foreground"
         }`}
       >
@@ -547,8 +547,8 @@
           {/if}
 
           <Button
-            class="cursor-pointer w-full mt-auto"
-            variant={getButtonVariant(plan)}
+            class="cursor-pointer w-full mt-auto btn-gradient-outline rounded-lg"
+            variant="ghost"
             disabled={isCurrentPlan(plan.tier) ||
               loadingPlan === plan.stripePriceId}
             onclick={() => handleSubscribe(plan.stripePriceId, plan.name)}

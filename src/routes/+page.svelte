@@ -69,12 +69,12 @@
 
   const featureIcons = [SparkleIcon, ImageIcon, VideoIcon, MessageCircleIcon, SparkleIcon, ShieldIcon];
   const featureGradients = [
-    "from-purple-500 to-pink-500",
-    "from-blue-500 to-cyan-500",
-    "from-green-500 to-teal-500",
-    "from-orange-500 to-red-500",
     "from-indigo-500 to-purple-500",
-    "from-gray-600 to-gray-800",
+    "from-blue-500 to-indigo-500",
+    "from-violet-500 to-purple-600",
+    "from-indigo-400 to-violet-500",
+    "from-blue-600 to-purple-500",
+    "from-purple-500 to-indigo-600",
   ];
   const defaultFeatures = [
     { title: "65 Models", desc: "Discover an expansive library of over 65 AI models tailored to your needs, from cutting-edge text-based LLMs like GPT, Claude, Gemini variants to specialized tools for creative generation.", tags: "Text Generation, Image Generation, Video Generation" },
@@ -184,7 +184,7 @@
         {#if session?.user}
           <Button
             onclick={() => handleNavClick("newchat")}
-            class="cursor-pointer bg-white text-black text-md font-semibold hover:bg-gray-300 transition-colors rounded-full"
+            class="cursor-pointer btn-gradient text-md font-semibold rounded-full"
           >
             Go to App
             <ArrowRightIcon class="w-4 h-4" />
@@ -193,13 +193,13 @@
           <Button
             variant="outline"
             onclick={() => handleNavClick("signin")}
-            class="cursor-pointer text-md font-medium border-gray-300 rounded-full"
+            class="cursor-pointer text-md font-medium border-gray-500 text-gray-200 hover:border-indigo-400 hover:text-white rounded-full"
           >
             Sign In
           </Button>
           <Button
             onclick={() => handleNavClick("signup")}
-            class="cursor-pointer bg-white text-black text-md font-medium hover:bg-gray-300 transition-colors rounded-full"
+            class="cursor-pointer btn-gradient text-md font-medium rounded-full"
           >
             Sign Up
           </Button>
@@ -247,7 +247,7 @@
             {#if session?.user}
               <Button
                 onclick={() => handleNavClick("newchat")}
-                class="w-full hover:bg-gray-300 text-black rounded-full"
+                class="w-full btn-gradient rounded-full"
               >
                 Go to App
                 <ArrowRightIcon class="w-4 h-4" />
@@ -256,13 +256,13 @@
               <Button
                 variant="outline"
                 onclick={() => handleNavClick("signin")}
-                class="w-full border-gray-300 rounded-full"
+                class="w-full border-gray-500 text-gray-200 rounded-full"
               >
                 Sign In
               </Button>
               <Button
                 onclick={() => handleNavClick("signup")}
-                class="w-full hover:bg-gray-300 text-black rounded-full"
+                class="w-full btn-gradient rounded-full"
               >
                 Sign Up
               </Button>
@@ -279,12 +279,12 @@
   class="relative py-2 px-4 overflow-hidden"
   style="background-color: #101011"
 >
-  <div class="absolute inset-0 opacity-20">
+  <div class="absolute inset-0 opacity-30">
     <div
-      class="absolute top-20 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl"
+      class="absolute top-20 left-10 w-72 h-72 bg-indigo-500/15 rounded-full blur-3xl"
     ></div>
     <div
-      class="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"
+      class="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/15 rounded-full blur-3xl"
     ></div>
   </div>
 
@@ -301,7 +301,7 @@
         >
           {l("hero_heading", "Unlock AI Magic: Text, Images, Videos –")}
           <span
-            class="bg-gradient-to-r from-cyan-400 via-pink-500 to-yellow-400 bg-clip-text text-transparent italic font-serif"
+            class="text-gradient italic font-serif"
             >{l("hero_highlight", "Create Without Limits")}</span
           >
         </h1>
@@ -316,7 +316,7 @@
           <Button
             size="lg"
             onclick={() => handleNavClick("newchat")}
-            class="cursor-pointer bg-white text-black px-8 py-3 text-lg font-semibold hover:bg-gray-300 transition-colors rounded-full"
+            class="cursor-pointer btn-gradient px-8 py-3 text-lg font-semibold rounded-full"
           >
             {l("hero_cta_text", "Get Started for Free")}
           </Button>
@@ -324,11 +324,11 @@
 
         <div class="flex flex-col gap-4">
           <div class="flex -space-x-2">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 border-2 border-gray-800"></div>
-            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-green-400 to-blue-500 border-2 border-gray-800"></div>
-            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-pink-400 to-red-500 border-2 border-gray-800"></div>
-            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 border-2 border-gray-800"></div>
             <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-400 to-purple-500 border-2 border-gray-800"></div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-400 to-indigo-500 border-2 border-gray-800"></div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-violet-400 to-purple-600 border-2 border-gray-800"></div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-violet-400 border-2 border-gray-800"></div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-400 to-indigo-600 border-2 border-gray-800"></div>
           </div>
           <div class="flex items-center gap-2">
             <div class="flex">
@@ -391,9 +391,9 @@
     style="background: linear-gradient(to bottom, #101011, rgba(16, 16, 17, 0.5), #101011)"
   ></div>
   <div class="absolute inset-0 opacity-30">
-    <div class="absolute top-20 left-10 w-72 h-72 bg-purple-400/20 rounded-full blur-3xl"></div>
-    <div class="absolute bottom-20 right-10 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-cyan-400/10 rounded-full blur-3xl"></div>
+    <div class="absolute top-20 left-10 w-72 h-72 bg-indigo-400/20 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-20 right-10 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-violet-400/10 rounded-full blur-3xl"></div>
   </div>
 
   <div class="container mx-auto relative">
@@ -410,7 +410,7 @@
       {#each features as feature}
         {@const Icon = feature.icon}
         <Card.Root
-          class="border border-border hover:border-purple-500 transition-colors duration-200"
+          class="border border-border hover:border-indigo-400 transition-all duration-300 glow-gradient-hover"
           style="background-color: #0a0a0a"
         >
           <Card.Content class="p-8">
@@ -527,8 +527,8 @@
                 {/each}
               </ul>
               <Button
-                class="cursor-pointer w-full mt-auto"
-                variant="outline"
+                class="cursor-pointer w-full mt-auto btn-gradient-outline rounded-lg"
+                variant="ghost"
                 onclick={() => {
                   if (isInIframe()) breakOutToPath("/pricing");
                   else goto("/pricing");
@@ -574,7 +574,7 @@
           <Button
             size="lg"
             onclick={() => handleNavClick("newchat")}
-            class="cursor-pointer bg-white hover:bg-gray-300 px-8 py-3 text-lg font-semibold"
+            class="cursor-pointer btn-gradient px-8 py-3 text-lg font-semibold rounded-full"
           >
             {l("cta_button_text", "Get Started for Free")}
             <ArrowRightIcon class="w-4 h-4" />
