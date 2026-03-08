@@ -430,6 +430,7 @@ export const pricingPlans = pgTable("pricing_plan", {
         imageGenerationLimit: integer("imageGenerationLimit"), // null = unlimited
         videoGenerationLimit: integer("videoGenerationLimit"), // null = unlimited
         audioGenerationLimit: integer("audioGenerationLimit"), // null = unlimited
+        voiceGenerationLimit: integer("voiceGenerationLimit"), // null = unlimited
         features: json("features").$type<string[]>().notNull().default([]),
         isActive: boolean("isActive").notNull().default(true),
         createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),

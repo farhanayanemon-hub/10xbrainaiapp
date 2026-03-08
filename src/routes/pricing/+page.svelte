@@ -520,6 +520,22 @@
                 Audio Generation
               </li>
             {/if}
+            {#if plan.voiceGenerationLimit !== 0}
+              <li class="flex items-center text-sm">
+                <div
+                  class="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center mr-3 flex-shrink-0"
+                >
+                  <svg
+                    class="w-2 h-2 text-white"
+                    fill="currentColor"
+                    viewBox="0 0 8 8"
+                  >
+                    <path d="M6.5 1l-3.5 3.5-1.5-1.5-1 1 2.5 2.5 4.5-4.5z" />
+                  </svg>
+                </div>
+                Voice Generation
+              </li>
+            {/if}
             <!-- Additional features -->
             {#each plan.features as feature}
               <li class="flex items-center text-sm">

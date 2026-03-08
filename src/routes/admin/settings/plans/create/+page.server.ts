@@ -30,6 +30,7 @@ export const actions: Actions = {
     const imageGenerationLimit = data.get('imageGenerationLimit')?.toString()
     const videoGenerationLimit = data.get('videoGenerationLimit')?.toString()
     const audioGenerationLimit = data.get('audioGenerationLimit')?.toString()
+    const voiceGenerationLimit = data.get('voiceGenerationLimit')?.toString()
     const features = data.get('features')?.toString()
 
     // Validation
@@ -46,6 +47,7 @@ export const actions: Actions = {
         imageGenerationLimit,
         videoGenerationLimit,
         audioGenerationLimit,
+        voiceGenerationLimit,
         features
       })
     }
@@ -63,6 +65,7 @@ export const actions: Actions = {
         imageGenerationLimit,
         videoGenerationLimit,
         audioGenerationLimit,
+        voiceGenerationLimit,
         features
       })
     }
@@ -80,6 +83,7 @@ export const actions: Actions = {
         imageGenerationLimit,
         videoGenerationLimit,
         audioGenerationLimit,
+        voiceGenerationLimit,
         features
       })
     }
@@ -98,6 +102,7 @@ export const actions: Actions = {
         imageGenerationLimit,
         videoGenerationLimit,
         audioGenerationLimit,
+        voiceGenerationLimit,
         features
       })
     }
@@ -108,6 +113,7 @@ export const actions: Actions = {
       const imageLimit = imageGenerationLimit === '' || imageGenerationLimit === undefined || imageGenerationLimit === null ? null : parseInt(imageGenerationLimit)
       const videoLimit = videoGenerationLimit === '' || videoGenerationLimit === undefined || videoGenerationLimit === null ? null : parseInt(videoGenerationLimit)
       const audioLimit = audioGenerationLimit === '' || audioGenerationLimit === undefined || audioGenerationLimit === null ? null : parseInt(audioGenerationLimit)
+      const voiceLimit = voiceGenerationLimit === '' || voiceGenerationLimit === undefined || voiceGenerationLimit === null ? null : parseInt(voiceGenerationLimit)
 
       // Parse features array
       let featuresArray: string[] = []
@@ -131,6 +137,7 @@ export const actions: Actions = {
         imageGenerationLimit: imageLimit !== null && !isNaN(imageLimit) ? imageLimit : null,
         videoGenerationLimit: videoLimit !== null && !isNaN(videoLimit) ? videoLimit : null,
         audioGenerationLimit: audioLimit !== null && !isNaN(audioLimit) ? audioLimit : null,
+        voiceGenerationLimit: voiceLimit !== null && !isNaN(voiceLimit) ? voiceLimit : null,
         features: featuresArray,
         isActive: true
       })
@@ -155,6 +162,7 @@ export const actions: Actions = {
         imageGenerationLimit,
         videoGenerationLimit,
         audioGenerationLimit,
+        voiceGenerationLimit,
         features
       })
     }

@@ -276,6 +276,19 @@
                 value={form?.audioGenerationLimit || ''}
               />
             </div>
+
+            <div class="space-y-2">
+              <Label for="voiceGenerationLimit">Voice Generation Limit</Label>
+              <Input
+                id="voiceGenerationLimit"
+                name="voiceGenerationLimit"
+                type="number"
+                placeholder="Unlimited"
+                min="0"
+                value={form?.voiceGenerationLimit || ''}
+              />
+              <p class="text-xs text-muted-foreground">ElevenLabs voice features (TTS, voice change, etc.)</p>
+            </div>
           </div>
         </div>
 

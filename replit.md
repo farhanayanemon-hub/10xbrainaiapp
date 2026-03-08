@@ -125,9 +125,19 @@ src/
 
 - Sidebar toggle uses a 3-line hamburger icon (MenuIcon) instead of PanelLeftIcon
 - "New Chat" uses MessageCircleIcon; a separate CirclePlusIcon (+) button opens a popover menu
-- The + popover contains: New Chat, Image & Video, Audio — consolidating navigation
+- The + popover contains only "New Chat"; Image & Video and Audio are standalone sidebar items
 - Projects remains as a standalone sidebar item below a divider
 - Key files: `src/lib/components/ChatSidebar.svelte`, `src/lib/components/ui/sidebar/sidebar-trigger.svelte`
+
+## Pricing Plans
+
+- Plans stored in `pricing_plan` table, managed via Admin > Settings > Plans
+- Seed endpoint: `POST /api/admin/seed-pricing-plans` populates default plans
+- Usage limits: text, image, video, audio, voice generation limits (null = unlimited, 0 = excluded)
+- `voiceGenerationLimit` column tracks ElevenLabs voice feature limits per plan
+- Plans displayed on `/pricing` page filtered by billing interval (monthly/yearly)
+- Supports both Stripe (USD) and Opaybd (BDT) pricing
+- Key files: `src/routes/pricing/`, `src/routes/admin/settings/plans/`, `src/lib/server/pricing-plans-seeder.ts`
 
 ## Voice Mode (Voice Input)
 
