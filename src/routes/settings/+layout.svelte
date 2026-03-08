@@ -11,6 +11,7 @@
     CreditCardIcon,
     AnalyticsIcon,
     ShieldIcon,
+    BrainIcon,
   } from "$lib/icons/index.js";
 
   let { children } = $props();
@@ -46,6 +47,12 @@
       label: m["settings.nav_privacy"](),
       path: "/settings/privacy",
       icon: ShieldIcon,
+    },
+    {
+      id: "ai-personalization",
+      label: "AI Personalization",
+      path: "/settings/ai-personalization",
+      icon: BrainIcon,
     },
   ];
 

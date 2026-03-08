@@ -140,6 +140,14 @@ src/
 - Visual feedback: red pulse during recording with timer, spinner during transcription
 - Key files: `src/lib/components/chat/voice-mode-state.svelte.ts`, `src/lib/components/chat/ChatInput.svelte`, `src/lib/components/ChatInterface.svelte`
 
+## AI Personalization
+
+- Users can set their profession and custom instructions in Settings > AI Personalization
+- User's name (from profile), profession, and personal instructions are injected into every chat as a system message
+- Custom instructions limited to 2000 characters, profession to 100 characters
+- DB columns: `profession text` and `personalInstructions text` on `user` table
+- Key files: `src/routes/settings/ai-personalization/`, `src/routes/api/chat-stream/+server.ts` (buildUserPersonalization function)
+
 ## Backups
 
 - `opaybd-backup/` - Archived Opaybd payment integration files for reference

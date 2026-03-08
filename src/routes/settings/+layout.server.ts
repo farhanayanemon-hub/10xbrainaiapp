@@ -22,7 +22,9 @@ export const load: LayoutServerLoad = async ({ locals, parent }) => {
         isAdmin: users.isAdmin,
         emailVerified: users.emailVerified,
         createdAt: users.createdAt,
-        marketingConsent: users.marketingConsent
+        marketingConsent: users.marketingConsent,
+        profession: users.profession,
+        personalInstructions: users.personalInstructions
       })
       .from(users)
       .where(eq(users.id, session.user.id))

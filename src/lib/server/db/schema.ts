@@ -34,6 +34,8 @@ export const users = pgTable("user", {
         }).default("free"),
         marketingConsent: boolean("marketingConsent").notNull().default(false),
         createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+        profession: text("profession"),
+        personalInstructions: text("personalInstructions"),
 })
 
 export const accounts = pgTable(
