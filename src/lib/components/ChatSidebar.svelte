@@ -215,22 +215,48 @@
               <MessageCircleIcon class="w-4 h-4" />
               {m["nav.new_chat"]()}
             </button>
-            <button
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors cursor-pointer"
-              onclick={() => { plusMenuOpen = false; goto("/image-video"); }}
-            >
-              <ImagesIcon class="w-4 h-4" />
-              {m["nav.image_video"]()}
-            </button>
-            <button
-              class="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors cursor-pointer"
-              onclick={() => { plusMenuOpen = false; goto("/audio"); }}
-            >
-              <AudioLinesIcon class="w-4 h-4" />
-              {m["nav.audio"]()}
-            </button>
           </Popover.Content>
         </Popover.Root>
+      </div>
+
+      <hr class="my-2 mr-2 border-border" />
+
+      <!-- Image & Video Button -->
+      <div
+        class="group/imgvid flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
+        onclick={() => goto("/image-video")}
+        role="button"
+        tabindex="0"
+        onkeydown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            goto("/image-video");
+          }
+        }}
+      >
+        <ImagesIcon
+          class="w-5 h-5 transition-transform duration-300 group-hover/imgvid:scale-110"
+        />
+        <span>{m["nav.image_video"]()}</span>
+      </div>
+
+      <!-- Audio Button -->
+      <div
+        class="group/audio flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
+        onclick={() => goto("/audio")}
+        role="button"
+        tabindex="0"
+        onkeydown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            goto("/audio");
+          }
+        }}
+      >
+        <AudioLinesIcon
+          class="w-5 h-5 transition-transform duration-300 group-hover/audio:scale-110"
+        />
+        <span>{m["nav.audio"]()}</span>
       </div>
 
       <hr class="my-2 mr-2 border-border" />
