@@ -9,7 +9,9 @@
     GlobeIcon,
     StarIcon,
     CameraIcon,
+    MicIcon,
   } from "$lib/icons/index.js";
+  import { VoiceModeState } from "./voice-mode-state.svelte.js";
   import { GUEST_MESSAGE_LIMIT } from "$lib/constants/guest-limits.js";
   import { getAllToolNames, getToolDisplayName } from "$lib/ai/tools/index.js";
   import { IsMounted } from "runed";
@@ -81,6 +83,8 @@
     onSelectModel: (modelName: string) => boolean;
     onSelectTool: (tool: string | undefined) => void;
     onWebSearchToggle?: (enabled: boolean) => void;
+    voiceMode?: VoiceModeState;
+    onVoiceTranscript?: (text: string) => void;
     cleanMessageContent: (content: string) => string;
     canGuestSendMessage: () => boolean;
     getModelDisplayName: (modelName: string) => string;
@@ -105,10 +109,25 @@
     onSelectModel,
     onSelectTool,
     onWebSearchToggle,
+    voiceMode,
+    onVoiceTranscript,
     cleanMessageContent,
     canGuestSendMessage,
     getModelDisplayName,
   }: Props = $props();
+
+  async function handleVoiceClick() {
+    if (!voiceMode) return;
+
+    if (voiceMode.isRecording) {
+      const text = await voiceMode.stopAndTranscribe();
+      if (text && onVoiceTranscript) {
+        onVoiceTranscript(text);
+      }
+    } else {
+      await voiceMode.startRecording();
+    }
+  }
 
   const mounted = new IsMounted();
 
@@ -834,6 +853,35 @@
             >
               <GlobeIcon class="size-4" />
               <span class="hidden sm:inline">Search</span>
+            </Button>
+          {/if}
+
+          <!-- Voice Input Button -->
+          {#if voiceMode}
+            <Button
+              type="button"
+              variant={voiceMode.isRecording ? "secondary" : "ghost"}
+              size="sm"
+              class="h-8 gap-1.5 text-xs cursor-pointer {voiceMode.isRecording
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 animate-pulse'
+                : voiceMode.isTranscribing
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
+              onclick={handleVoiceClick}
+              disabled={voiceMode.isTranscribing || isLoading}
+              aria-label={voiceMode.isRecording ? "Stop recording" : "Start voice input"}
+            >
+              {#if voiceMode.isTranscribing}
+                <svg class="size-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                </svg>
+                <span class="hidden sm:inline">Transcribing...</span>
+              {:else if voiceMode.isRecording}
+                <MicIcon class="size-4" />
+                <span class="hidden sm:inline">{voiceMode.formatTime(voiceMode.recordingTime)}</span>
+              {:else}
+                <MicIcon class="size-4" />
+              {/if}
             </Button>
           {/if}
         </PromptInputTools>

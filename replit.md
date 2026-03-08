@@ -129,6 +129,17 @@ src/
 - Projects remains as a standalone sidebar item below a divider
 - Key files: `src/lib/components/ChatSidebar.svelte`, `src/lib/components/ui/sidebar/sidebar-trigger.svelte`
 
+## Voice Mode (Voice Input)
+
+- Mic button in chat input toolbar for voice-to-text input
+- Uses browser MediaRecorder API to capture audio (WebM/Opus or MP4)
+- Sends recording to `/api/audio-transcription` (ElevenLabs Scribe v1) for speech-to-text
+- Transcribed text placed in chat input for review/editing before sending
+- Audio usage limits enforced via existing `UsageTrackingService` (checkUsageLimit + trackUsage for 'audio')
+- VoiceModeState class (Svelte 5 runes) manages recording lifecycle, transcription, timers, cleanup
+- Visual feedback: red pulse during recording with timer, spinner during transcription
+- Key files: `src/lib/components/chat/voice-mode-state.svelte.ts`, `src/lib/components/chat/ChatInput.svelte`, `src/lib/components/ChatInterface.svelte`
+
 ## Backups
 
 - `opaybd-backup/` - Archived Opaybd payment integration files for reference

@@ -20,6 +20,7 @@
   import PromptTemplates from "./chat/PromptTemplates.svelte";
   import MessagesList from "./chat/MessagesList.svelte";
   import ChatInput from "./chat/ChatInput.svelte";
+  import { VoiceModeState } from "./chat/voice-mode-state.svelte.js";
 
   // Conversation components for auto-scroll management
   import {
@@ -37,6 +38,8 @@
 
   let chatInput: ChatInput;
   const mounted = new IsMounted();
+
+  const voiceMode = new VoiceModeState();
 
   // Timer management for cleanup
   let timers: Set<ReturnType<typeof setTimeout>> = new Set();
@@ -57,11 +60,12 @@
     return timer;
   }
 
-  // Cleanup timers on component destroy
+  // Cleanup timers and voice mode on component destroy
   $effect(() => {
     return () => {
       timers.forEach((timer) => clearTimeout(timer));
       timers.clear();
+      voiceMode.destroy();
     };
   });
 
@@ -204,6 +208,13 @@
     onSelectModel={(modelName) => chatState.selectModel(modelName)}
     onSelectTool={(tool) => (chatState.selectedTool = tool)}
     onWebSearchToggle={(enabled) => (chatState.webSearchEnabled = enabled)}
+    {voiceMode}
+    onVoiceTranscript={(text) => {
+      chatState.prompt = text;
+      managedTimeout(() => {
+        chatInput?.focusWithCursor(text.length);
+      }, TIMING.PROMPT_TEMPLATE_FOCUS);
+    }}
     cleanMessageContent={(content) => chatState.cleanMessageContent(content)}
     canGuestSendMessage={() => chatState.canGuestSendMessage()}
     getModelDisplayName={(name) => chatState.getModelDisplayName(name)}
