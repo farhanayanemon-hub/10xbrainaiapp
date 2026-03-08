@@ -14,6 +14,7 @@
     GemIcon,
     ShieldIcon,
     MailIcon,
+    HomeIcon,
   } from "$lib/icons/index.js";
 
   let { children, data } = $props();
@@ -31,6 +32,12 @@
       label: "Branding",
       path: "/admin/settings/branding",
       icon: PaletteIcon,
+    },
+    {
+      id: "landing",
+      label: "Landing Page",
+      path: "/admin/settings/landing",
+      icon: HomeIcon,
     },
     {
       id: "payment-methods",

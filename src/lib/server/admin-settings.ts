@@ -474,3 +474,7 @@ export async function getSecuritySettings() {
 export async function getMailingSettings() {
   return await adminSettingsService.getSettingsByCategory('mailing');
 }
+
+export async function getLandingSettings() {
+  return await adminSettingsService.getSettingsByCategory('landing');
+}
