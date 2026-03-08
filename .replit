@@ -10,3 +10,36 @@ channel = "stable-25_05"
 [userenv.shared]
 NODE_ENV = "development"
 PUBLIC_ORIGIN = "https://135f9627-2e96-4614-a146-3ea259b83d6e-00-3er22o31j9smw.sisko.replit.dev"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "build/index.js"]
+build = ["npm", "run", "build"]
