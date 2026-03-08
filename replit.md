@@ -9,7 +9,7 @@ An AI platform built with SvelteKit that provides access to 65+ AI models for te
 - **Styling**: Tailwind CSS v4
 - **Database**: PostgreSQL via Drizzle ORM
 - **Auth**: Auth.js (SvelteKit) with email/password + OAuth
-- **Payments**: Stripe
+- **Payments**: Stripe + Opaybd (BDT support)
 - **Storage**: Local filesystem (with optional Cloudflare R2)
 - **AI**: OpenRouter (text), Replicate (images/video), ElevenLabs (audio)
 - **i18n**: Paraglide JS (en, de, es, pt)
@@ -62,9 +62,20 @@ src/
 - **App Update**: Admin panel includes an "App Update" page at `/admin/settings/app-update` where admins can upload a zip file to update app code while preserving database, env vars, uploads, and settings. The endpoint includes path traversal protection, symlink rejection, and rollback on npm install failure.
 - **Landing Page Settings**: Admin panel at `/admin/settings/landing` allows editing all landing page text content (hero, features, pricing section text, CTA, FAQs, footer). Content is stored in the `admin_settings` table under category `'landing'`. The public landing page (`+page.svelte`) loads content from DB with hardcoded fallback defaults. Pricing plans on the landing page are loaded dynamically from the `pricingPlans` DB table via `getPricingPlans('month')`.
 
+## Payment Integration
+
+- **Stripe**: Default payment provider, supports USD
+- **Opaybd**: Bangladesh payment gateway supporting BDT (bKash, Nagad, etc.)
+- Active provider is set via Admin > Settings > Payment Methods (`activePaymentProvider` setting)
+- Currency display is dynamic: shows ৳ (BDT) when Opaybd is active, $ (USD) for Stripe
+- `priceAmountBdt` column on `pricing_plan` table stores BDT prices in paisa
+- Opaybd subscriptions require manual renewal (tracked via `renewalRequired` on subscription table)
+- `RenewalBanner` component shows renewal prompts in the main app layout
+- Key files: `src/lib/server/opaybd.ts`, `src/lib/server/payment-router.ts`, `src/routes/api/opaybd/`
+
 ## Backups
 
-- `opaybd-backup/` - Archived Opaybd payment integration files for future reference
+- `opaybd-backup/` - Archived Opaybd payment integration files for reference
 - `opaybd-backup.tar.gz` - Compressed archive of the same
 
 ## Deployment
