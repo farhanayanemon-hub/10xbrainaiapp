@@ -86,6 +86,7 @@ export { default as EyeOffIcon } from "@lucide/svelte/icons/eye-off";
 export { default as CloudIcon } from "@lucide/svelte/icons/cloud";
 export { default as GlobeIcon } from "@lucide/svelte/icons/globe";
 export { default as MenuIcon } from "@lucide/svelte/icons/menu";
+export { default as LayoutIcon } from "@lucide/svelte/icons/layout";
 
 // Audio page icons
 export { default as AudioLinesIcon } from "@lucide/svelte/icons/audio-lines";

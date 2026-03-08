@@ -60,6 +60,7 @@ src/
 ## Admin Features
 
 - **App Update**: Admin panel includes an "App Update" page at `/admin/settings/app-update` where admins can upload a zip file to update app code while preserving database, env vars, uploads, and settings. The endpoint includes path traversal protection, symlink rejection, and rollback on npm install failure.
+- **Landing Page Settings**: Admin panel at `/admin/settings/landing` allows editing all landing page text content (hero, features, pricing section text, CTA, FAQs, footer). Content is stored in the `admin_settings` table under category `'landing'`. The public landing page (`+page.svelte`) loads content from DB with hardcoded fallback defaults. Pricing plans on the landing page are loaded dynamically from the `pricingPlans` DB table via `getPricingPlans('month')`.
 
 ## Backups
 

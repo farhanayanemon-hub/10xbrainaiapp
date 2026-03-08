@@ -15,6 +15,7 @@
     ShieldIcon,
     MailIcon,
     UploadIcon,
+    LayoutIcon,
   } from "$lib/icons/index.js";
 
   let { children, data } = $props();
@@ -32,6 +33,12 @@
       label: "Branding",
       path: "/admin/settings/branding",
       icon: PaletteIcon,
+    },
+    {
+      id: "landing",
+      label: "Landing Page",
+      path: "/admin/settings/landing",
+      icon: LayoutIcon,
     },
     {
       id: "payment-methods",
