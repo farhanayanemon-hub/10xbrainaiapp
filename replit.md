@@ -121,6 +121,14 @@ src/
 - Carousel auto-scrolls, pauses on hover/touch, shows edge gradients
 - Key files: `src/lib/server/prompt-suggestions.ts`, `src/lib/components/chat/PromptTemplates.svelte`, `src/routes/admin/settings/prompt-suggestions/`
 
+## Sidebar Layout
+
+- Sidebar toggle uses a 3-line hamburger icon (MenuIcon) instead of PanelLeftIcon
+- "New Chat" uses MessageCircleIcon; a separate CirclePlusIcon (+) button opens a popover menu
+- The + popover contains: New Chat, Image & Video, Audio — consolidating navigation
+- Projects remains as a standalone sidebar item below a divider
+- Key files: `src/lib/components/ChatSidebar.svelte`, `src/lib/components/ui/sidebar/sidebar-trigger.svelte`
+
 ## Backups
 
 - `opaybd-backup/` - Archived Opaybd payment integration files for reference

@@ -5,6 +5,7 @@
   // UI Component imports
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
+  import * as Popover from "$lib/components/ui/popover/index.js";
   import Button from "$lib/components/ui/button/button.svelte";
   import Logo from "$lib/components/Logo.svelte";
 
@@ -26,8 +27,11 @@
     GlobeIcon,
     CheckIcon,
     FolderOpenIcon,
+    MessageCircleIcon,
   } from "$lib/icons/index.js";
   import GitBranch from "@lucide/svelte/icons/git-branch";
+
+  let plusMenuOpen = $state(false);
 
   import { getContext } from "svelte";
   import type { ChatState } from "./chat-state.svelte.js";
@@ -170,61 +174,63 @@
         <Logo alt="App Logo" />
       </div>
 
-      <!-- New Chat Button -->
-      <div
-        class="group/newchat flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
-        onclick={() => chatState.startNewChat()}
-        role="button"
-        tabindex="0"
-        onkeydown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            chatState.startNewChat();
-          }
-        }}
-      >
-        <CirclePlusIcon
-          class="w-5 h-5 transition-transform duration-300 group-hover/newchat:scale-110 group-hover/newchat:rotate-8"
-        />
-        <span>{m["nav.new_chat"]()}</span>
-      </div>
+      <!-- New Chat Button with Plus Menu -->
+      <div class="flex items-center gap-1 mr-2">
+        <div
+          class="group/newchat flex-1 flex items-center p-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
+          onclick={() => chatState.startNewChat()}
+          role="button"
+          tabindex="0"
+          onkeydown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              chatState.startNewChat();
+            }
+          }}
+        >
+          <MessageCircleIcon
+            class="w-5 h-5 transition-transform duration-300 group-hover/newchat:scale-110"
+          />
+          <span>{m["nav.new_chat"]()}</span>
+        </div>
 
-      <!-- Image & Video Button -->
-      <div
-        class="group/imagevideo flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
-        onclick={() => goto("/image-video")}
-        role="button"
-        tabindex="0"
-        onkeydown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            goto("/image-video");
-          }
-        }}
-      >
-        <ImagesIcon
-          class="w-5 h-5 transition-transform duration-300 group-hover/imagevideo:scale-110 group-hover/imagevideo:rotate-4"
-        />
-        <span>{m["nav.image_video"]()}</span>
-      </div>
-
-      <!-- Audio Button -->
-      <div
-        class="group/audio flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
-        onclick={() => goto("/audio")}
-        role="button"
-        tabindex="0"
-        onkeydown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            goto("/audio");
-          }
-        }}
-      >
-        <AudioLinesIcon
-          class="w-5 h-5 transition-transform duration-300 group-hover/audio:scale-110 group-hover/audio:rotate-4"
-        />
-        <span>{m["nav.audio"]()}</span>
+        <Popover.Root bind:open={plusMenuOpen}>
+          <Popover.Trigger>
+            {#snippet child({ props })}
+              <button
+                {...props}
+                class="p-1.5 rounded-md hover:bg-accent/100 transition-colors cursor-pointer"
+              >
+                <CirclePlusIcon
+                  class="w-5 h-5 transition-transform duration-300 {plusMenuOpen ? 'rotate-45' : ''} hover:scale-110"
+                />
+              </button>
+            {/snippet}
+          </Popover.Trigger>
+          <Popover.Content side="right" align="start" class="w-48 p-1">
+            <button
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors cursor-pointer"
+              onclick={() => { plusMenuOpen = false; chatState.startNewChat(); }}
+            >
+              <MessageCircleIcon class="w-4 h-4" />
+              {m["nav.new_chat"]()}
+            </button>
+            <button
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors cursor-pointer"
+              onclick={() => { plusMenuOpen = false; goto("/image-video"); }}
+            >
+              <ImagesIcon class="w-4 h-4" />
+              {m["nav.image_video"]()}
+            </button>
+            <button
+              class="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors cursor-pointer"
+              onclick={() => { plusMenuOpen = false; goto("/audio"); }}
+            >
+              <AudioLinesIcon class="w-4 h-4" />
+              {m["nav.audio"]()}
+            </button>
+          </Popover.Content>
+        </Popover.Root>
       </div>
 
       <hr class="my-2 mr-2 border-border" />
