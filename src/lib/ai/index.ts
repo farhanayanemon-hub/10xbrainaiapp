@@ -2,6 +2,7 @@ import type { AIProvider, AIModelConfig } from './types.js';
 import { openRouterProvider } from './providers/openrouter.js';
 import { replicateProvider } from './providers/replicate.js';
 import { elevenlabsProvider } from './providers/elevenlabs.js';
+import { removeWebSearchSuffix } from '$lib/constants/web-search.js';
 
 export const AI_PROVIDERS: AIProvider[] = [
 	openRouterProvider,
@@ -18,8 +19,10 @@ export function getProvider(providerName: string): AIProvider | undefined {
 }
 
 export function getModelProvider(modelName: string): AIProvider | undefined {
+	// Handle OpenRouter web search suffix (:online) by checking base model name
+	const baseModelName = removeWebSearchSuffix(modelName);
 	return AI_PROVIDERS.find(provider =>
-		provider.models.some(model => model.name === modelName)
+		provider.models.some(model => model.name === baseModelName)
 	);
 }
 

@@ -1,7 +1,7 @@
 import { deepResearchTool } from './deep-research.js';
 import { thinkLongerTool } from './think-longer.js';
 
-// Tool registry with all available AI SDK v5 tools
+// Tool registry with all available AI SDK v6 tools
 export const AVAILABLE_TOOLS = {
 	deep_research: deepResearchTool,
 	think_longer: thinkLongerTool
@@ -28,7 +28,7 @@ export function getAllTools(): ToolInstance[] {
 }
 
 /**
- * Get tools as an object (for AI SDK v5 streamText)
+ * Get tools as an object (for AI SDK v6 streamText)
  */
 export function getToolsAsObject(toolNames?: string[]): Record<string, ToolInstance> {
 	if (!toolNames || toolNames.length === 0) {
@@ -45,7 +45,7 @@ export function getToolsAsObject(toolNames?: string[]): Record<string, ToolInsta
 }
 
 /**
- * Get specific tools by name (returns as array for backward compatibility)
+ * Get specific tools by name (returns as array)
  */
 export function getTools(toolNames: string[]): ToolInstance[] {
 	return toolNames
@@ -66,7 +66,8 @@ export function getTool(toolName: string): ToolInstance | undefined {
 export function getToolDisplayName(toolName: string): string {
 	const displayNames: Record<string, string> = {
 		deep_research: 'Deep Research',
-		think_longer: 'Think Longer'
+		think_longer: 'Think Longer',
+		web_search: 'Web Search'
 	};
 	return displayNames[toolName] || toolName;
 }

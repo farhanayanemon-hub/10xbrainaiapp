@@ -83,57 +83,21 @@ export const actions: Actions = {
     if (googleEnabled) {
       if (!googleClientId || !googleClientSecret) {
         return fail(400, {
-          error: 'Google Client ID and Secret are required when Google OAuth is enabled',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Google Client ID and Secret are required when Google OAuth is enabled'
         })
       }
 
       // Validate Google Client ID format
       if (!googleClientId.endsWith('.apps.googleusercontent.com')) {
         return fail(400, {
-          error: 'Invalid Google Client ID format. It should end with .apps.googleusercontent.com',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Invalid Google Client ID format. It should end with .apps.googleusercontent.com'
         })
       }
 
       // Validate Google Client Secret format
       if (!googleClientSecret.startsWith('GOCSPX-')) {
         return fail(400, {
-          error: 'Invalid Google Client Secret format. It should start with GOCSPX-',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Invalid Google Client Secret format. It should start with GOCSPX-'
         })
       }
     }
@@ -142,57 +106,21 @@ export const actions: Actions = {
     if (appleEnabled) {
       if (!appleClientId || !appleClientSecret) {
         return fail(400, {
-          error: 'Apple Client ID and Secret are required when Apple OAuth is enabled',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Apple Client ID and Secret are required when Apple OAuth is enabled'
         })
       }
 
       // Apple Service ID validation - should be a reverse domain format
       if (!appleClientId.includes('.') || appleClientId.length < 3) {
         return fail(400, {
-          error: 'Invalid Apple Service ID format. It should be in reverse domain format (e.g., com.yourcompany.yourapp)',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Invalid Apple Service ID format. It should be in reverse domain format (e.g., com.yourcompany.yourapp)'
         })
       }
 
       // Apple Client Secret validation - accept multiple formats (JWT, Client Secret, or Private Key)
       if (appleClientSecret.length < 10) {
         return fail(400, {
-          error: 'Apple Client Secret is too short. It should be a valid Client Secret, JWT, or Private Key',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Apple Client Secret is too short. It should be a valid Client Secret, JWT, or Private Key'
         })
       }
     }
@@ -201,57 +129,21 @@ export const actions: Actions = {
     if (twitterEnabled) {
       if (!twitterClientId || !twitterClientSecret) {
         return fail(400, {
-          error: 'X Client ID and Secret are required when X OAuth is enabled',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'X Client ID and Secret are required when X OAuth is enabled'
         })
       }
 
       // Basic Twitter Client ID validation (should be alphanumeric string)
       if (twitterClientId.length < 10 || !/^[a-zA-Z0-9_-]+$/.test(twitterClientId)) {
         return fail(400, {
-          error: 'Invalid X Client ID format. It should be an alphanumeric string of at least 10 characters',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Invalid X Client ID format. It should be an alphanumeric string of at least 10 characters'
         })
       }
 
       // Twitter Client Secret validation - should be a long alphanumeric string
       if (twitterClientSecret.length < 20 || !/^[a-zA-Z0-9_-]+$/.test(twitterClientSecret)) {
         return fail(400, {
-          error: 'Invalid X Client Secret format. It should be an alphanumeric string of at least 20 characters',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Invalid X Client Secret format. It should be an alphanumeric string of at least 20 characters'
         })
       }
     }
@@ -260,57 +152,21 @@ export const actions: Actions = {
     if (facebookEnabled) {
       if (!facebookClientId || !facebookClientSecret) {
         return fail(400, {
-          error: 'Facebook App ID and App Secret are required when Facebook OAuth is enabled',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Facebook App ID and App Secret are required when Facebook OAuth is enabled'
         })
       }
 
       // Facebook App ID validation - should be numeric and at least 15 digits
       if (!/^\d{15,}$/.test(facebookClientId)) {
         return fail(400, {
-          error: 'Invalid Facebook App ID format. It should be a numeric string of at least 15 digits',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Invalid Facebook App ID format. It should be a numeric string of at least 15 digits'
         })
       }
 
       // Facebook App Secret validation - should be at least 32 characters
       if (facebookClientSecret.length < 32) {
         return fail(400, {
-          error: 'Invalid Facebook App Secret format. It should be at least 32 characters long',
-          googleEnabled,
-          googleClientId,
-          googleClientSecret,
-          appleEnabled,
-          appleClientId,
-          appleClientSecret,
-          twitterEnabled,
-          twitterClientId,
-          twitterClientSecret,
-          facebookEnabled,
-          facebookClientId,
-          facebookClientSecret
+          error: 'Invalid Facebook App Secret format. It should be at least 32 characters long'
         })
       }
     }
@@ -407,40 +263,13 @@ export const actions: Actions = {
 
       console.log('OAuth settings saved successfully');
 
-      // Get updated settings to return current values
-      const updatedSettings = await getOAuthSettings();
-
       return {
-        success: true,
-        googleEnabled: updatedSettings.google_enabled === 'true',
-        googleClientId: updatedSettings.google_client_id || '',
-        googleClientSecret: updatedSettings.google_client_secret || '',
-        appleEnabled: updatedSettings.apple_enabled === 'true',
-        appleClientId: updatedSettings.apple_client_id || '',
-        appleClientSecret: updatedSettings.apple_client_secret || '',
-        twitterEnabled: updatedSettings.twitter_enabled === 'true',
-        twitterClientId: updatedSettings.twitter_client_id || '',
-        twitterClientSecret: updatedSettings.twitter_client_secret || '',
-        facebookEnabled: updatedSettings.facebook_enabled === 'true',
-        facebookClientId: updatedSettings.facebook_client_id || '',
-        facebookClientSecret: updatedSettings.facebook_client_secret || ''
+        success: true
       }
     } catch (error) {
       console.error('Error saving OAuth settings:', error)
       return fail(500, {
-        error: 'Failed to save OAuth settings. Please try again.',
-        googleEnabled,
-        googleClientId,
-        googleClientSecret,
-        appleEnabled,
-        appleClientId,
-        appleClientSecret,
-        twitterEnabled,
-        twitterClientId,
-        twitterClientSecret,
-        facebookEnabled,
-        facebookClientId,
-        facebookClientSecret
+        error: 'Failed to save OAuth settings. Please try again.'
       })
     }
   }

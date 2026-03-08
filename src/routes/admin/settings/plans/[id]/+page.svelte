@@ -182,9 +182,9 @@
         </div>
 
         <!-- Pricing Information -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="space-y-2">
-            <Label for="priceAmount">Price USD (in cents)</Label>
+            <Label for="priceAmount">Price (in cents)</Label>
             <Input
               id="priceAmount"
               name="priceAmount"
@@ -199,23 +199,6 @@
             </p>
           </div>
 
-          <div class="space-y-2">
-            <Label for="priceAmountBdt">Price BDT (in paisa)</Label>
-            <Input
-              id="priceAmountBdt"
-              name="priceAmountBdt"
-              type="number"
-              placeholder="150000"
-              min="0"
-              value={form?.priceAmountBdt || (data.plan.priceAmountBdt ?? "")}
-            />
-            <p class="text-xs text-muted-foreground">
-              For Opaybd payments (e.g., 150000 = ৳1,500)
-            </p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="currency">Currency</Label>
             <Select.Root type="single" name="currency" bind:value={currency}>

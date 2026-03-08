@@ -139,6 +139,17 @@ export const images = pgTable("image", {
 	fileSize: integer("fileSize").notNull(),
 	storageLocation: text("storageLocation").notNull().default("local"), // 'local' | 'r2'
 	cloudPath: text("cloudPath"), // Path/key for cloud storage (null for local files)
+	// Generation metadata (nullable for backward compatibility)
+	prompt: text("prompt"), // Generation prompt
+	model: text("model"), // Model name (e.g., "flux-schnell")
+	aspectRatio: text("aspectRatio"), // e.g., "1:1", "16:9"
+	seed: integer("seed"), // Random seed for reproducibility
+	quality: text("quality"), // Quality setting (model-specific)
+	style: text("style"), // Style setting (model-specific)
+	numberOfImages: integer("numberOfImages"), // Number of images generated
+	referenceImageUrl: text("referenceImageUrl"), // i2i reference image URL
+	upscaleFactor: text("upscaleFactor"), // Upscale factor (e.g., "x2", "x4") - Google Upscaler
+	compressionQuality: integer("compressionQuality"), // Compression quality (1-100) - Google Upscaler
 	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
 }, (table) => [
 	// Composite index for library queries (order by createdAt DESC for user)
@@ -165,6 +176,15 @@ export const videos = pgTable("video", {
 	hasAudio: boolean("hasAudio").notNull().default(true), // Veo 3 generates audio natively
 	storageLocation: text("storageLocation").notNull().default("local"), // 'local' | 'r2'
 	cloudPath: text("cloudPath"), // Path/key for cloud storage (null for local files)
+	// Generation metadata (nullable for backward compatibility)
+	prompt: text("prompt"), // Generation prompt
+	model: text("model"), // Model name (e.g., "ray-flash-2-720p")
+	aspectRatio: text("aspectRatio"), // e.g., "16:9"
+	seed: integer("seed"), // Random seed for reproducibility
+	quality: text("quality"), // Quality setting (model-specific)
+	style: text("style"), // Style setting (model-specific)
+	imageStartUrl: text("imageStartUrl"), // i2v start frame URL
+	imageEndUrl: text("imageEndUrl"), // i2v end frame URL
 	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
 }, (table) => [
 	// Composite index for library queries (order by createdAt DESC for user)
@@ -183,6 +203,7 @@ export const audio = pgTable("audio", {
 		.notNull()
 		.references(() => users.id, { onDelete: "cascade" }),
 	chatId: text("chatId"), // Optional - audio may not always be associated with a specific chat
+	messageIndex: integer("messageIndex"), // Index of message in chat (for Read Aloud caching)
 	mimeType: text("mimeType").notNull(),
 	fileSize: integer("fileSize").notNull(),
 	duration: integer("duration"), // Audio duration in seconds (estimated from text length)
@@ -197,6 +218,9 @@ export const audio = pgTable("audio", {
 	index('audio_user_created_idx').on(table.userId, table.createdAt),
 	// Index for filtering by storage location (R2 vs local)
 	index('audio_storage_location_idx').on(table.storageLocation),
+	// Composite index for Read Aloud cache lookups (userId, chatId, messageIndex)
+	// Enables O(1) cache hit queries instead of O(n) full table scans
+	index('audio_cache_lookup_idx').on(table.userId, table.chatId, table.messageIndex),
 ])
 
 export const transcriptions = pgTable("transcriptions", {
@@ -306,6 +330,38 @@ export const soundEffects = pgTable("sound_effects", {
 	index('sound_effects_storage_location_idx').on(table.storageLocation),
 ])
 
+export const projects = pgTable("project", {
+	id: text("id")
+		.primaryKey()
+		.$defaultFn(() => randomUUID()),
+	userId: text("userId")
+		.notNull()
+		.references(() => users.id, { onDelete: "cascade" }),
+	name: text("name").notNull(),
+	description: text("description"),
+	customInstructions: text("customInstructions"), // System prompt for this project
+	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+	updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
+}, (table) => [
+	index('projects_user_created_idx').on(table.userId, table.createdAt),
+])
+
+export const projectFiles = pgTable("project_file", {
+	id: text("id")
+		.primaryKey()
+		.$defaultFn(() => randomUUID()),
+	projectId: text("projectId")
+		.notNull()
+		.references(() => projects.id, { onDelete: "cascade" }),
+	filename: text("filename").notNull(),
+	mimeType: text("mimeType").notNull(),
+	fileSize: integer("fileSize").notNull(), // bytes
+	content: text("content").notNull(), // text content stored directly in DB
+	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+}, (table) => [
+	index('project_files_project_idx').on(table.projectId),
+])
+
 export const chats = pgTable("chat", {
 	id: text("id")
 		.primaryKey()
@@ -327,24 +383,30 @@ export const chats = pgTable("chat", {
 		type?: 'text' | 'image' | 'video';
 	}>>().notNull().default([]),
 	pinned: boolean("pinned").notNull().default(false),
+	isBranch: boolean("isBranch").notNull().default(false),
+	branchAtIndex: integer("branchAtIndex"),
+	branchSourceChatId: text("branchSourceChatId"),
+	projectId: text("projectId")
+		.references(() => projects.id, { onDelete: "set null" }), // Chats preserved if project deleted
 	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
 	updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
-})
+}, (table) => [
+	index('chats_project_idx').on(table.projectId),
+])
 
 export const pricingPlans = pgTable("pricing_plan", {
 	id: text("id")
 		.primaryKey()
 		.$defaultFn(() => randomUUID()),
 	name: text("name").notNull(),
-	tier: text("tier", {
-		enum: ["free", "starter", "pro", "advanced"]
+	tier: text("tier", { 
+		enum: ["free", "starter", "pro", "advanced"] 
 	}).notNull(),
 	stripePriceId: text("stripePriceId").notNull().unique(),
-	priceAmount: integer("priceAmount").notNull(), // Price in USD cents
-	priceAmountBdt: integer("priceAmountBdt"), // Price in BDT paisa (for Opaybd), nullable
+	priceAmount: integer("priceAmount").notNull(), // Price in cents
 	currency: text("currency").notNull().default("usd"),
-	billingInterval: text("billingInterval", {
-		enum: ["month", "year"]
+	billingInterval: text("billingInterval", { 
+		enum: ["month", "year"] 
 	}).notNull().default("month"),
 	textGenerationLimit: integer("textGenerationLimit"), // null = unlimited
 	imageGenerationLimit: integer("imageGenerationLimit"), // null = unlimited
@@ -365,14 +427,14 @@ export const subscriptions = pgTable("subscription", {
 		.references(() => users.id, { onDelete: "cascade" }),
 	stripeSubscriptionId: text("stripeSubscriptionId").notNull().unique(),
 	stripePriceId: text("stripePriceId").notNull(),
-	planTier: text("planTier", {
-		enum: ["free", "starter", "pro", "advanced"]
+	planTier: text("planTier", { 
+		enum: ["free", "starter", "pro", "advanced"] 
 	}).notNull(),
-	previousPlanTier: text("previousPlanTier", {
-		enum: ["free", "starter", "pro", "advanced"]
+	previousPlanTier: text("previousPlanTier", { 
+		enum: ["free", "starter", "pro", "advanced"] 
 	}), // Track previous plan for plan change analytics
-	status: text("status", {
-		enum: ["active", "canceled", "incomplete", "incomplete_expired", "past_due", "trialing", "unpaid"]
+	status: text("status", { 
+		enum: ["active", "canceled", "incomplete", "incomplete_expired", "past_due", "trialing", "unpaid"] 
 	}).notNull(),
 	currentPeriodStart: timestamp("currentPeriodStart", { mode: "date" }).notNull(),
 	currentPeriodEnd: timestamp("currentPeriodEnd", { mode: "date" }).notNull(),
@@ -380,15 +442,6 @@ export const subscriptions = pgTable("subscription", {
 	canceledAt: timestamp("canceledAt", { mode: "date" }),
 	endedAt: timestamp("endedAt", { mode: "date" }),
 	planChangedAt: timestamp("planChangedAt", { mode: "date" }), // Track when plan was last changed
-	// Payment provider tracking
-	paymentProvider: text("paymentProvider", {
-		enum: ["stripe", "opaybd"]
-	}).notNull().default("stripe"),
-	// Opaybd-specific fields (nullable for Stripe subscriptions)
-	opayTransactionId: text("opayTransactionId"),
-	renewalRequired: boolean("renewalRequired").default(false), // For Opaybd subscriptions that need manual renewal
-	lastPaymentAmount: integer("lastPaymentAmount"), // Store in cents for renewal reference
-	renewalReminderSentAt: timestamp("renewalReminderSentAt", { mode: "date" }),
 	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
 	updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
 })
@@ -425,22 +478,14 @@ export const paymentHistory = pgTable("payment_history", {
 		.references(() => subscriptions.id, { onDelete: "set null" }),
 	amount: integer("amount").notNull(), // Amount in cents
 	currency: text("currency").notNull().default("usd"),
-	status: text("status", {
-		enum: ["succeeded", "pending", "failed", "canceled", "refunded"]
+	status: text("status", { 
+		enum: ["succeeded", "pending", "failed", "canceled", "refunded"] 
 	}).notNull(),
 	description: text("description"),
-	paymentMethodType: text("paymentMethodType"), // card, bank_transfer, bKash, Nagad, etc.
+	paymentMethodType: text("paymentMethodType"), // card, bank_transfer, etc.
 	last4: text("last4"), // Last 4 digits of payment method
 	brand: text("brand"), // visa, mastercard, etc.
 	paidAt: timestamp("paidAt", { mode: "date" }),
-	// Payment provider tracking
-	paymentProvider: text("paymentProvider", {
-		enum: ["stripe", "opaybd"]
-	}).notNull().default("stripe"),
-	// Opaybd-specific fields
-	opayTransactionId: text("opayTransactionId"),
-	opayPaymentMethod: text("opayPaymentMethod"), // e.g., 'bKash', 'Nagad', 'Card', etc.
-	opayPaymentFee: integer("opayPaymentFee"), // Payment gateway fee in cents
 	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
 })
 
@@ -457,6 +502,22 @@ export const adminSettings = pgTable("admin_settings", {
 	updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
 }, (table) => [
 	index('admin_settings_category_idx').on(table.category),
+])
+
+export const favoriteModels = pgTable("favorite_model", {
+	id: text("id")
+		.primaryKey()
+		.$defaultFn(() => randomUUID()),
+	userId: text("userId")
+		.notNull()
+		.references(() => users.id, { onDelete: "cascade" }),
+	modelName: text("modelName").notNull(),
+	createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
+}, (table) => [
+	// Composite unique constraint: user can only favorite a model once
+	unique('user_model_unique').on(table.userId, table.modelName),
+	// Index for fast lookup of user's favorites
+	index('favorite_models_user_idx').on(table.userId),
 ])
 
 export const adminFiles = pgTable("admin_files", {

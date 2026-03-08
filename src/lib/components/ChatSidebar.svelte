@@ -13,8 +13,8 @@
     ChevronDownIcon,
     CirclePlusIcon,
     UpgradeIcon,
-    ImagesIcon,
     AudioLinesIcon,
+    ImagesIcon,
     LoginIcon,
     LogOutIcon,
     MoreHorizontalIcon,
@@ -25,7 +25,9 @@
     UserIcon,
     GlobeIcon,
     CheckIcon,
+    FolderOpenIcon,
   } from "$lib/icons/index.js";
+  import GitBranch from "@lucide/svelte/icons/git-branch";
 
   import { getContext } from "svelte";
   import type { ChatState } from "./chat-state.svelte.js";
@@ -67,6 +69,7 @@
   title: string;
   model: string;
   pinned: boolean;
+  isBranch: boolean;
   createdAt: string;
   updatedAt: string;
 })}
@@ -87,8 +90,11 @@
         onclick={() => chatState.loadChat(chat.id)}
       >
         <div class="flex flex-col gap-1 min-w-0">
-          <span class="font-light text-sm truncate leading-tight block">
-            {chat.title}
+          <span class="font-light text-sm truncate leading-tight flex items-center gap-1">
+            {#if chat.isBranch || chat.title.endsWith(' (Branch)')}
+              <GitBranch class="w-3 h-3 flex-shrink-0 text-muted-foreground" />
+            {/if}
+            <span class="truncate">{chat.title}</span>
           </span>
           <div
             class="flex items-center gap-2 text-xs text-muted-foreground leading-tight"
@@ -183,6 +189,25 @@
         <span>{m["nav.new_chat"]()}</span>
       </div>
 
+      <!-- Image & Video Button -->
+      <div
+        class="group/imagevideo flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
+        onclick={() => goto("/image-video")}
+        role="button"
+        tabindex="0"
+        onkeydown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            goto("/image-video");
+          }
+        }}
+      >
+        <ImagesIcon
+          class="w-5 h-5 transition-transform duration-300 group-hover/imagevideo:scale-110 group-hover/imagevideo:rotate-4"
+        />
+        <span>{m["nav.image_video"]()}</span>
+      </div>
+
       <!-- Audio Button -->
       <div
         class="group/audio flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
@@ -202,23 +227,25 @@
         <span>{m["nav.audio"]()}</span>
       </div>
 
-      <!-- Library Button -->
+      <hr class="my-2 mr-2 border-border" />
+
+      <!-- Projects Button -->
       <div
-        class="group/library flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
-        onclick={() => goto("/library")}
+        class="group/projects flex items-center p-2 mr-2 gap-1 text-md font-semibold cursor-pointer hover:text-primary transition-colors hover:bg-accent/100 rounded-md"
+        onclick={() => goto("/projects")}
         role="button"
         tabindex="0"
         onkeydown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            goto("/library");
+            goto("/projects");
           }
         }}
       >
-        <ImagesIcon
-          class="w-5 h-5 transition-transform duration-300 group-hover/library:scale-110 group-hover/library:rotate-4"
+        <FolderOpenIcon
+          class="w-5 h-5 transition-transform duration-300 group-hover/projects:scale-110 group-hover/projects:rotate-4"
         />
-        <span>{m["nav.library"]()}</span>
+        <span>{m["nav.projects"]()}</span>
       </div>
     </div>
   </Sidebar.Header>
@@ -436,6 +463,17 @@
                 <div class="flex items-center justify-between w-full">
                   <span>{m["common.portuguese"]()}</span>
                   {#if currentLocale === "pt"}
+                    <CheckIcon class="w-4 h-4 ml-2" />
+                  {/if}
+                </div>
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                onclick={() => changeLanguage("ar")}
+                class="cursor-pointer"
+              >
+                <div class="flex items-center justify-between w-full">
+                  <span>{m["common.arabic"]()}</span>
+                  {#if currentLocale === "ar"}
                     <CheckIcon class="w-4 h-4 ml-2" />
                   {/if}
                 </div>

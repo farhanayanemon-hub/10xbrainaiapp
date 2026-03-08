@@ -2,8 +2,20 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types.js';
 import { db } from '$lib/server/db/index.js';
 import { images, videos, audio, transcriptions, voiceChanges, music, soundEffects, chats } from '$lib/server/db/schema.js';
-import { eq, desc, or, isNull } from 'drizzle-orm';
+import { eq, desc, or, isNull, and, isNotNull } from 'drizzle-orm';
 import { storageService } from '$lib/server/storage.js';
+
+/**
+ * Transform reference image URLs to fix legacy /static/uploads/ prefix.
+ * SvelteKit serves static/ folder at root, so /static/uploads/x should be /uploads/x.
+ */
+function transformReferenceImageUrl(url: string | null): string | null {
+	if (!url) return null;
+	if (url.startsWith('/static/uploads/')) {
+		return url.replace('/static/uploads/', '/uploads/');
+	}
+	return url;
+}
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	try {
@@ -16,10 +28,16 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		const searchParams = url.searchParams;
 		const type = searchParams.get('type'); // 'images', 'videos', 'audio', 'transcription', 'voice_change', 'music', 'sound_effects', or null for all
 
+		// Pagination parameters (only apply to single-type requests)
+		const limit = type ? parseInt(searchParams.get('limit') || '0') : 0; // 0 = no limit
+		const offset = type ? parseInt(searchParams.get('offset') || '0') : 0;
+
 		// Fetch user's images with optional chat context
 		let userImages: any[] = [];
+		let hasMoreImages = false;
 		if (!type || type === 'images') {
-			const rawImages = await db
+			// Build query with optional pagination
+			let query = db
 				.select({
 					id: images.id,
 					filename: images.filename,
@@ -31,11 +49,41 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 					chatId: images.chatId,
 					chatTitle: chats.title,
 					chatModel: chats.model,
+					// Generation metadata
+					prompt: images.prompt,
+					model: images.model,
+					aspectRatio: images.aspectRatio,
+					seed: images.seed,
+					quality: images.quality,
+					style: images.style,
+					numberOfImages: images.numberOfImages,
+					referenceImageUrl: images.referenceImageUrl,
+					upscaleFactor: images.upscaleFactor,
+					compressionQuality: images.compressionQuality,
 				})
 				.from(images)
 				.leftJoin(chats, eq(images.chatId, chats.id))
-				.where(eq(images.userId, session.user.id))
-				.orderBy(desc(images.createdAt));
+				.where(
+					and(
+						eq(images.userId, session.user.id),
+						isNotNull(images.model)
+					)
+				)
+				.orderBy(desc(images.createdAt))
+				.$dynamic();
+
+			// Apply pagination if limit is specified
+			if (type === 'images' && limit > 0) {
+				query = query.limit(limit + 1).offset(offset); // Fetch one extra to check hasMore
+			}
+
+			const rawImages = await query;
+
+			// Check if there are more items beyond this batch
+			if (type === 'images' && limit > 0 && rawImages.length > limit) {
+				hasMoreImages = true;
+				rawImages.pop(); // Remove the extra item
+			}
 
 			// Generate URLs for each image based on storage location
 			const imagesWithUrls = await Promise.all(
@@ -54,7 +102,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 					return {
 						...img,
 						type: 'image' as const,
-						url: imageUrl
+						url: imageUrl,
+						referenceImageUrl: transformReferenceImageUrl(img.referenceImageUrl)
 					};
 				})
 			);
@@ -64,8 +113,10 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
 		// Fetch user's videos with optional chat context
 		let userVideos: any[] = [];
+		let hasMoreVideos = false;
 		if (!type || type === 'videos') {
-			const rawVideos = await db
+			// Build query with optional pagination
+			let query = db
 				.select({
 					id: videos.id,
 					filename: videos.filename,
@@ -81,11 +132,34 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 					chatId: videos.chatId,
 					chatTitle: chats.title,
 					chatModel: chats.model,
+					// Generation metadata
+					prompt: videos.prompt,
+					model: videos.model,
+					aspectRatio: videos.aspectRatio,
+					seed: videos.seed,
+					quality: videos.quality,
+					style: videos.style,
+					imageStartUrl: videos.imageStartUrl,
+					imageEndUrl: videos.imageEndUrl,
 				})
 				.from(videos)
 				.leftJoin(chats, eq(videos.chatId, chats.id))
 				.where(eq(videos.userId, session.user.id))
-				.orderBy(desc(videos.createdAt));
+				.orderBy(desc(videos.createdAt))
+				.$dynamic();
+
+			// Apply pagination if limit is specified
+			if (type === 'videos' && limit > 0) {
+				query = query.limit(limit + 1).offset(offset); // Fetch one extra to check hasMore
+			}
+
+			const rawVideos = await query;
+
+			// Check if there are more items beyond this batch
+			if (type === 'videos' && limit > 0 && rawVideos.length > limit) {
+				hasMoreVideos = true;
+				rawVideos.pop(); // Remove the extra item
+			}
 
 			// Generate URLs for each video based on storage location
 			const videosWithUrls = await Promise.all(
@@ -104,7 +178,9 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 					return {
 						...vid,
 						type: 'video' as const,
-						url: videoUrl
+						url: videoUrl,
+						imageStartUrl: transformReferenceImageUrl(vid.imageStartUrl),
+						imageEndUrl: transformReferenceImageUrl(vid.imageEndUrl)
 					};
 				})
 			);
@@ -384,7 +460,10 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			transcriptions: userTranscriptions.length,
 			voiceChanges: userVoiceChanges.length,
 			music: userMusic.length,
-			soundEffects: userSoundEffects.length
+			soundEffects: userSoundEffects.length,
+			// Include hasMore for paginated single-type requests
+			...(type === 'images' && limit > 0 && { hasMore: hasMoreImages }),
+			...(type === 'videos' && limit > 0 && { hasMore: hasMoreVideos })
 		});
 	} catch (error) {
 		console.error('Get library error:', error);

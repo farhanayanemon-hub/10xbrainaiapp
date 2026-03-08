@@ -33,8 +33,6 @@
 
   // Payment history baseline tracking
   let baselinePaymentCount = $state(0);
-  let pendingOpayTransactionId = $state<string | null>(null);
-  let isVerifyingPendingOpay = $state(false);
 
   // Function to fetch fresh billing data with retry logic
   async function refreshBillingData(
@@ -203,65 +201,6 @@
   // Shared function to handle URL parameters
   let hasProcessedUrlParams = $state(false);
 
-  async function verifyPendingOpayPayment(
-    transactionId: string | null = pendingOpayTransactionId
-  ) {
-    if (!transactionId || isVerifyingPendingOpay) {
-      return;
-    }
-
-    try {
-      isVerifyingPendingOpay = true;
-
-      const response = await fetch("/api/opaybd/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ transactionId }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to verify Opaybd payment");
-      }
-
-      const result = await response.json();
-
-      if (result.status === "success") {
-        toast.success(
-          result.alreadyProcessed
-            ? "Payment was already confirmed and your subscription is active."
-            : "Payment verified successfully. Your subscription is now active."
-        );
-        pendingOpayTransactionId = null;
-        if (browser) {
-          sessionStorage.removeItem("pending_opay_transaction_id");
-        }
-        await refreshBillingData(undefined, true);
-        return;
-      }
-
-      if (result.status === "pending") {
-        toast.info(
-          result.message ||
-            "Payment is still pending. Please try verification again in a few minutes."
-        );
-        return;
-      }
-
-      toast.error(result.message || "Payment could not be verified.");
-      pendingOpayTransactionId = null;
-      if (browser) {
-        sessionStorage.removeItem("pending_opay_transaction_id");
-      }
-    } catch (error) {
-      console.error("Error verifying pending Opaybd payment:", error);
-      toast.error("Unable to verify payment right now. Please try again shortly.");
-    } finally {
-      isVerifyingPendingOpay = false;
-    }
-  }
-
   async function processUrlParameters() {
     if (hasProcessedUrlParams || !browser) return;
 
@@ -274,11 +213,7 @@
     if (
       !urlParams.has("subscription_updated") &&
       !urlParams.has("subscription_error") &&
-      !urlParams.has("session_id") &&
-      !urlParams.has("opay_success") &&
-      !urlParams.has("opay_pending") &&
-      !urlParams.has("opay_failed") &&
-      !urlParams.has("canceled")
+      !urlParams.has("session_id")
     ) {
       return;
     }
@@ -305,59 +240,13 @@
       toast.error(decodeURIComponent(errorMessage));
     }
 
-    // Handle checkout session completion (from PayPal/Card payments via Stripe)
+    // Handle checkout session completion (from PayPal/Card payments)
     if (urlParams.has("session_id")) {
       const sessionId = urlParams.get("session_id");
       if (sessionId) {
         await handleCheckoutSessionComplete(sessionId);
         shouldRefresh = true;
       }
-    }
-
-    // Handle Opaybd payment callback results
-    if (urlParams.get("opay_success") === "true") {
-      const planTier = urlParams.get("plan_tier");
-      toast.success(
-        planTier
-          ? `Successfully subscribed to ${planTier} plan via Opaybd!`
-          : "Payment successful! Your subscription is now active."
-      );
-      pendingOpayTransactionId = null;
-      sessionStorage.removeItem("pending_opay_transaction_id");
-      shouldRefresh = true;
-      expectNewPayment = true;
-    }
-
-    if (urlParams.get("opay_pending") === "true") {
-      const transactionId = urlParams.get("transaction_id");
-      toast.info(
-        "Your payment is being processed. It may take a few minutes to confirm."
-      );
-      // Store transaction ID for manual verification if needed
-      if (transactionId) {
-        pendingOpayTransactionId = transactionId;
-        sessionStorage.setItem("pending_opay_transaction_id", transactionId);
-        console.log("Pending Opaybd transaction:", transactionId);
-      }
-      shouldRefresh = true;
-    }
-
-    if (urlParams.get("opay_failed") === "true") {
-      toast.error(
-        "Payment failed. Please try again or use a different payment method."
-      );
-      pendingOpayTransactionId = null;
-      sessionStorage.removeItem("pending_opay_transaction_id");
-    }
-
-    // Handle cancelled checkout (both Stripe and Opaybd)
-    if (urlParams.get("canceled") === "true") {
-      const provider = urlParams.get("provider");
-      toast.info(
-        provider === "opaybd"
-          ? "Payment was cancelled. You can try again when ready."
-          : "Checkout was cancelled. You can try again when ready."
-      );
     }
 
     // Clean up URL parameters using SvelteKit navigation
@@ -373,13 +262,6 @@
   // Handle URL parameters on initial page load
   onMount(async () => {
     if (browser) {
-      const storedPendingTransaction = sessionStorage.getItem(
-        "pending_opay_transaction_id"
-      );
-      if (storedPendingTransaction) {
-        pendingOpayTransactionId = storedPendingTransaction;
-      }
-
       // Delay replaceState to ensure router is initialized
       setTimeout(async () => {
         await processUrlParameters();
@@ -625,30 +507,6 @@
           {/if}
         </div>
       </div>
-
-      {#if pendingOpayTransactionId}
-        <div class="rounded-lg border border-amber-200 bg-amber-50/70 dark:border-amber-800 dark:bg-amber-900/20 p-3 space-y-3">
-          <p class="text-sm text-amber-900 dark:text-amber-200">
-            Your Opaybd payment is still pending confirmation.
-          </p>
-          <p class="text-xs text-amber-700 dark:text-amber-300 font-mono break-all">
-            Transaction: {pendingOpayTransactionId}
-          </p>
-          <Button
-            variant="outline"
-            onclick={() => verifyPendingOpayPayment()}
-            disabled={isVerifyingPendingOpay}
-            class="w-full sm:w-auto"
-          >
-            {#if isVerifyingPendingOpay}
-              <div class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
-              Verifying...
-            {:else}
-              Verify Payment Now
-            {/if}
-          </Button>
-        </div>
-      {/if}
 
       <div class="space-y-2">
         <h4 class="text-sm font-medium">{m["billing.plan_features"]()}</h4>

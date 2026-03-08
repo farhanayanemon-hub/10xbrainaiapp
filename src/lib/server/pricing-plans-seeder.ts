@@ -16,8 +16,7 @@ export interface PricingPlanSeed {
 	name: string;
 	tier: 'free' | 'starter' | 'pro' | 'advanced';
 	stripePriceId: string;
-	priceAmount: number; // in USD cents
-	priceAmountBdt?: number | null; // in BDT paisa (for Opaybd), optional
+	priceAmount: number; // in cents
 	currency: string;
 	billingInterval: 'month' | 'year';
 	textGenerationLimit: number | null;
@@ -35,7 +34,6 @@ const pricingPlansData: PricingPlanSeed[] = [
 		tier: 'free',
 		stripePriceId: 'free', // Special non-Stripe price ID for free plan
 		priceAmount: 0, // $0.00
-		priceAmountBdt: 0, // ৳0.00
 		currency: 'usd',
 		billingInterval: 'month',
 		textGenerationLimit: 10, // 10 text generations per month
@@ -58,7 +56,6 @@ const pricingPlansData: PricingPlanSeed[] = [
 		tier: 'starter',
 		stripePriceId: 'price_starter_monthly',
 		priceAmount: 1500, // $15.00
-		priceAmountBdt: 150000, // ৳1,500.00 (stored in paisa)
 		currency: 'usd',
 		billingInterval: 'month',
 		textGenerationLimit: 1000, // 1000 text generations per month
@@ -80,7 +77,6 @@ const pricingPlansData: PricingPlanSeed[] = [
 		tier: 'pro',
 		stripePriceId: 'price_pro_monthly',
 		priceAmount: 4900, // $49.00
-		priceAmountBdt: 500000, // ৳5,000.00 (stored in paisa)
 		currency: 'usd',
 		billingInterval: 'month',
 		textGenerationLimit: 5000, // 5000 text generations per month
@@ -105,7 +101,6 @@ const pricingPlansData: PricingPlanSeed[] = [
 		tier: 'advanced',
 		stripePriceId: 'price_advanced_monthly',
 		priceAmount: 14900, // $149.00
-		priceAmountBdt: 1500000, // ৳15,000.00 (stored in paisa)
 		currency: 'usd',
 		billingInterval: 'month',
 		textGenerationLimit: null, // Unlimited
@@ -133,7 +128,6 @@ const pricingPlansData: PricingPlanSeed[] = [
 		tier: 'starter',
 		stripePriceId: 'price_starter_yearly',
 		priceAmount: 12600, // $126.00 yearly (normally $180, save $54)
-		priceAmountBdt: 1260000, // ৳12,600.00 yearly (stored in paisa)
 		currency: 'usd',
 		billingInterval: 'year',
 		textGenerationLimit: 1000, // 1000 text generations per month
@@ -155,7 +149,6 @@ const pricingPlansData: PricingPlanSeed[] = [
 		tier: 'pro',
 		stripePriceId: 'price_pro_yearly',
 		priceAmount: 41160, // $411.60 yearly (normally $588, save $176.40)
-		priceAmountBdt: 4200000, // ৳42,000.00 yearly (stored in paisa)
 		currency: 'usd',
 		billingInterval: 'year',
 		textGenerationLimit: 5000, // 5000 text generations per month
@@ -180,7 +173,6 @@ const pricingPlansData: PricingPlanSeed[] = [
 		tier: 'advanced',
 		stripePriceId: 'price_advanced_yearly',
 		priceAmount: 125160, // $1,251.60 yearly (normally $1,788, save $536.40)
-		priceAmountBdt: 12600000, // ৳126,000.00 yearly (stored in paisa)
 		currency: 'usd',
 		billingInterval: 'year',
 		textGenerationLimit: null, // Unlimited
@@ -218,7 +210,7 @@ export async function seedPricingPlans(): Promise<void> {
 
 			if (existingPlan.length > 0) {
 				console.log(`Plan ${planData.name} already exists, updating...`);
-
+				
 				// Update existing plan
 				await db
 					.update(pricingPlans)
@@ -226,7 +218,6 @@ export async function seedPricingPlans(): Promise<void> {
 						name: planData.name,
 						tier: planData.tier,
 						priceAmount: planData.priceAmount,
-						priceAmountBdt: planData.priceAmountBdt ?? null,
 						currency: planData.currency,
 						billingInterval: planData.billingInterval,
 						textGenerationLimit: planData.textGenerationLimit,
@@ -240,12 +231,9 @@ export async function seedPricingPlans(): Promise<void> {
 					.where(eq(pricingPlans.stripePriceId, planData.stripePriceId));
 			} else {
 				console.log(`Creating new plan: ${planData.name}`);
-
-				// Insert new plan (include priceAmountBdt)
-				await db.insert(pricingPlans).values({
-					...planData,
-					priceAmountBdt: planData.priceAmountBdt ?? null,
-				});
+				
+				// Insert new plan
+				await db.insert(pricingPlans).values(planData);
 			}
 		}
 
@@ -292,29 +280,10 @@ export async function isValidPriceId(priceId: string): Promise<boolean> {
 				eq(pricingPlans.isActive, true)
 			))
 			.limit(1);
-
+		
 		return !!plan;
 	} catch (error) {
 		console.error('Error validating price ID:', error);
 		return false;
-	}
-}
-
-// Helper function to get a plan by its price ID
-export async function getPlanByPriceId(priceId: string) {
-	try {
-		const [plan] = await db
-			.select()
-			.from(pricingPlans)
-			.where(and(
-				eq(pricingPlans.stripePriceId, priceId),
-				eq(pricingPlans.isActive, true)
-			))
-			.limit(1);
-
-		return plan || null;
-	} catch (error) {
-		console.error('Error getting plan by price ID:', error);
-		return null;
 	}
 }

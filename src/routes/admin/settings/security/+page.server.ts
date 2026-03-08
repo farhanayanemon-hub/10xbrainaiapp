@@ -140,18 +140,12 @@ export const actions: Actions = {
       }
 
       return {
-        success: true,
-        turnstileEnabled: updatedTurnstileEnabled,
-        turnstileSiteKey: updatedSiteKey,
-        turnstileSecretKey: updatedSecretKey
+        success: true
       }
     } catch (error) {
       console.error('Error saving security settings:', error)
       return fail(500, {
-        error: 'Failed to save settings. Please try again.',
-        turnstileEnabled,
-        turnstileSiteKey,
-        turnstileSecretKey
+        error: 'Failed to save settings. Please try again.'
       })
     }
   }

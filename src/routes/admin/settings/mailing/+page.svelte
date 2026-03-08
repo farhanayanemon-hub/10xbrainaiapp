@@ -14,14 +14,14 @@
   let loading = $state(false);
   let showPassword = $state(false);
 
-  // Individual reactive form variables - initialize with current settings or form data
-  let smtpHost = $state(form?.smtpHost || data?.settings?.smtpHost || "");
-  let smtpPort = $state(form?.smtpPort || data?.settings?.smtpPort || "");
-  let smtpSecure = $state(form?.smtpSecure || data?.settings?.smtpSecure || "false");
-  let smtpUser = $state(form?.smtpUser || data?.settings?.smtpUser || "");
-  let smtpPass = $state(form?.smtpPass || data?.settings?.smtpPass || "");
-  let fromEmail = $state(form?.fromEmail || data?.settings?.fromEmail || "");
-  let fromName = $state(form?.fromName || data?.settings?.fromName || "");
+  // Individual reactive form variables - initialize from server-loaded settings
+  let smtpHost = $state(data?.settings?.smtpHost || "");
+  let smtpPort = $state(data?.settings?.smtpPort || "");
+  let smtpSecure = $state(data?.settings?.smtpSecure || "false");
+  let smtpUser = $state(data?.settings?.smtpUser || "");
+  let smtpPass = $state(data?.settings?.smtpPass || "");
+  let fromEmail = $state(data?.settings?.fromEmail || "");
+  let fromName = $state(data?.settings?.fromName || "");
 
   // State sync effect
   $effect(() => {
@@ -34,17 +34,6 @@
       smtpPass = data.settings.smtpPass || "";
       fromEmail = data.settings.fromEmail || "";
       fromName = data.settings.fromName || "";
-    }
-
-    // Update from form state if there was a validation error or success response
-    if (form) {
-      smtpHost = form.smtpHost || "";
-      smtpPort = form.smtpPort || "";
-      smtpSecure = form.smtpSecure || "false";
-      smtpUser = form.smtpUser || "";
-      smtpPass = form.smtpPass || "";
-      fromEmail = form.fromEmail || "";
-      fromName = form.fromName || "";
     }
   });
 
@@ -309,7 +298,7 @@
                   id="fromName"
                   name="fromName"
                   type="text"
-                  placeholder="AI Models Platform"
+                  placeholder="Your Company Name"
                   bind:value={fromName}
                   disabled={data.isDemoMode}
                 />

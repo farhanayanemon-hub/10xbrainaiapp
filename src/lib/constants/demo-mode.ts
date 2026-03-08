@@ -9,8 +9,7 @@ import { env } from '$env/dynamic/private';
 export const DEMO_ALLOWED_MODELS = [
 	"google/gemma-3-27b-it:free",
 	"openai/gpt-oss-20b:free",
-	"moonshotai/kimi-k2:free",
-	"z-ai/glm-4.5-air:free"
+	"moonshotai/kimi-k2:free"
 ];
 
 // Helper function to check if demo mode is enabled

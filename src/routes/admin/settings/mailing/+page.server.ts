@@ -62,42 +62,21 @@ export const actions: Actions = {
     // Basic validation - require essential fields
     if (!smtpHost || !smtpUser || !smtpPass) {
       return fail(400, {
-        error: 'SMTP Host, Username, and Password are required',
-        smtpHost,
-        smtpPort,
-        smtpSecure,
-        smtpUser,
-        smtpPass,
-        fromEmail,
-        fromName
+        error: 'SMTP Host, Username, and Password are required'
       })
     }
 
     // Validate port number if provided
     if (smtpPort && (isNaN(Number(smtpPort)) || Number(smtpPort) <= 0 || Number(smtpPort) > 65535)) {
       return fail(400, {
-        error: 'SMTP Port must be a valid number between 1 and 65535',
-        smtpHost,
-        smtpPort,
-        smtpSecure,
-        smtpUser,
-        smtpPass,
-        fromEmail,
-        fromName
+        error: 'SMTP Port must be a valid number between 1 and 65535'
       })
     }
 
     // Validate email format for fromEmail if provided
     if (fromEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fromEmail)) {
       return fail(400, {
-        error: 'From Email must be a valid email address',
-        smtpHost,
-        smtpPort,
-        smtpSecure,
-        smtpUser,
-        smtpPass,
-        fromEmail,
-        fromName
+        error: 'From Email must be a valid email address'
       })
     }
 
@@ -155,26 +134,12 @@ export const actions: Actions = {
       const updatedSettings = await getMailingSettings();
 
       return {
-        success: true,
-        smtpHost: updatedSettings.smtp_host || '',
-        smtpPort: updatedSettings.smtp_port || '',
-        smtpSecure: updatedSettings.smtp_secure || '',
-        smtpUser: updatedSettings.smtp_user || '',
-        smtpPass: updatedSettings.smtp_pass || '',
-        fromEmail: updatedSettings.from_email || '',
-        fromName: updatedSettings.from_name || ''
+        success: true
       }
     } catch (error) {
       console.error('Error saving mailing settings:', error)
       return fail(500, {
-        error: 'Failed to save mailing settings. Please try again.',
-        smtpHost,
-        smtpPort,
-        smtpSecure,
-        smtpUser,
-        smtpPass,
-        fromEmail,
-        fromName
+        error: 'Failed to save mailing settings. Please try again.'
       })
     }
   }

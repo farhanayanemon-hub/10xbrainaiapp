@@ -21,5 +21,6 @@ export const providerConfig: Record<string, ProviderIconConfig> = {
 	LeonardoAI: { iconPath: "/ai-provider-icons/leonardoai-favicon.png" },
 	Ideogram: { iconPath: "/ai-provider-icons/ideogram-favicon.png" },
 	Tencent: { iconPath: "/ai-provider-icons/tencent-favicon.png" },
-	Pixverse: { iconPath: "/ai-provider-icons/pixverse-favicon.jpg" }
+	Pixverse: { iconPath: "/ai-provider-icons/pixverse-favicon.jpg" },
+	MiniMax: { iconPath: "/ai-provider-icons/minimax-favicon.png" }
 };

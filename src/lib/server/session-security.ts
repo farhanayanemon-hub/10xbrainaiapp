@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { getPublicOrigin } from './settings-store.js';
 
 /**
  * Session security configuration for Auth.js
@@ -8,9 +9,9 @@ import { env } from '$env/dynamic/private';
 /**
  * Get secure cookie configuration based on environment
  */
-export function getSecureCookieConfig() {
+export async function getSecureCookieConfig() {
   const isProduction = env.NODE_ENV === 'production';
-  const publicOrigin = env.PUBLIC_ORIGIN as string | undefined;
+  const publicOrigin = await getPublicOrigin();
   const isHTTPS = publicOrigin?.startsWith('https://') || isProduction;
 
   return {

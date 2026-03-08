@@ -1,17 +1,64 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types.js';
 import { getModelProvider } from '$lib/ai/index.js';
-import type { AIMessage, AITool } from '$lib/ai/types.js';
-import { getAllTools, getTools } from '$lib/ai/tools/index.js';
+import type { AIMessage } from '$lib/ai/types.js';
 import { UsageTrackingService, UsageLimitError } from '$lib/server/usage-tracking.js';
 import { GUEST_MESSAGE_LIMIT, isModelAllowedForGuests } from '$lib/constants/guest-limits.js';
 import { isDemoModeRestricted, isModelAllowedForDemo, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
-import { streamText, type ModelMessage } from 'ai';
+import { removeWebSearchSuffix } from '$lib/constants/web-search.js';
+import { db } from '$lib/server/db/index.js';
+import { projects, projectFiles } from '$lib/server/db/schema.js';
+import { eq, and } from 'drizzle-orm';
+
+/**
+ * Builds a system message containing project custom instructions and file context.
+ * Returns null if the project has no instructions and no files.
+ */
+async function buildProjectSystemMessage(projectId: string, userId: string): Promise<AIMessage | null> {
+	const [project] = await db
+		.select({
+			customInstructions: projects.customInstructions,
+			userId: projects.userId,
+		})
+		.from(projects)
+		.where(and(eq(projects.id, projectId), eq(projects.userId, userId)));
+
+	if (!project) return null;
+
+	const files = await db
+		.select({
+			filename: projectFiles.filename,
+			mimeType: projectFiles.mimeType,
+			content: projectFiles.content,
+		})
+		.from(projectFiles)
+		.where(eq(projectFiles.projectId, projectId));
+
+	let systemContent = '';
+
+	if (project.customInstructions) {
+		systemContent += `## Project Instructions\n${project.customInstructions}\n\n`;
+	}
+
+	if (files.length > 0) {
+		systemContent += '## Project Context Files\n';
+		for (const file of files) {
+			systemContent += `\n---\nFile: ${file.filename} (${file.mimeType})\n---\n${file.content}\n`;
+		}
+	}
+
+	if (!systemContent) return null;
+
+	return {
+		role: 'system' as const,
+		content: systemContent.trim()
+	};
+}
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const body = await request.json();
-		const { model, messages, maxTokens, temperature, userId, chatId, selectedTool, tools } = body;
+		const { model, messages, maxTokens, temperature, userId, chatId, selectedTool, maxSteps } = body;
 
 		if (!model) {
 			return json({ error: 'Model is required' }, { status: 400 });
@@ -25,6 +72,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const session = await locals.getSession();
 		const isLoggedIn = !!session?.user?.id;
 
+		// Get base model name (without :online suffix) for validation
+		const baseModel = removeWebSearchSuffix(model);
+
 		// Validate guest user restrictions
 		if (!isLoggedIn) {
 			// Check guest message limit (count user messages only)
@@ -36,8 +86,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				}, { status: 429 });
 			}
 
-			// Check guest model restriction
-			if (!isModelAllowedForGuests(model)) {
+			// Check guest model restriction (use base model name)
+			if (!isModelAllowedForGuests(baseModel)) {
 				return json({
 					error: 'Guest users can only use the allowed guest models. Please sign up for access to all models.',
 					type: 'guest_model_restricted'
@@ -47,8 +97,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Validate demo mode restrictions for logged-in users
 		if (isLoggedIn && isDemoModeRestricted(isLoggedIn)) {
-			// Check demo mode model restriction
-			if (!isModelAllowedForDemo(model)) {
+			// Check demo mode model restriction (use base model name)
+			if (!isModelAllowedForDemo(baseModel)) {
 				return json({
 					error: DEMO_MODE_MESSAGES.MODEL_RESTRICTED,
 					type: 'demo_model_restricted'
@@ -72,29 +122,33 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			}
 		}
 
+		// Inject project context if projectId provided
+		if (body.projectId && session?.user?.id) {
+			const projectSystemMsg = await buildProjectSystemMessage(body.projectId, session.user.id);
+			if (projectSystemMsg) {
+				messages.unshift(projectSystemMsg);
+			}
+		}
+
 		const provider = getModelProvider(model);
 		if (!provider) {
 			return json({ error: `No provider found for model: ${model}` }, { status: 400 });
 		}
 
-		// Find the model configuration to check its capabilities
-		const modelConfig = provider.models.find(m => m.name === model);
+		// Find the model configuration to check its capabilities (use base model name)
+		const modelConfig = provider.models.find(m => m.name === baseModel);
 
-		// Determine which tools to use (as tool names)
-		let toolsToUse: AITool[] = [];
+		// Tool handling (AI SDK v6): use tool names directly
+		let toolNames: string[] = [];
 		if (selectedTool) {
-			// Single tool selected via UI - create AITool wrapper with tool name for compatibility
-			toolsToUse = [{ type: 'function', function: { name: selectedTool, description: '', parameters: { type: 'object', properties: {} } } }];
+			toolNames = [selectedTool];
 			console.log(`Using selected tool: ${selectedTool}`);
-		} else if (tools && Array.isArray(tools)) {
-			// Tools explicitly provided in request
-			toolsToUse = tools;
 		}
 
 		// Check if model supports functions when tools are requested
-		if (toolsToUse.length > 0 && !modelConfig?.supportsFunctions) {
+		if (toolNames.length > 0 && !modelConfig?.supportsFunctions) {
 			console.warn(`Model ${model} does not support functions, tools will be ignored`);
-			toolsToUse = [];
+			toolNames = [];
 		}
 
 		// Check if request has images (multimodal)
@@ -116,7 +170,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				stream: true, // Enable streaming for multimodal!
 				userId,
 				chatId,
-				tools: toolsToUse.length > 0 ? toolsToUse : undefined
+				toolNames: toolNames.length > 0 ? toolNames : undefined,
+				maxSteps
 			});
 		} else {
 			console.log('💬 [API /chat-stream] Using regular text streaming');
@@ -129,7 +184,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				stream: true, // Enable streaming
 				userId,
 				chatId,
-				tools: toolsToUse.length > 0 ? toolsToUse : undefined
+				toolNames: toolNames.length > 0 ? toolNames : undefined,
+				maxSteps
 			});
 		}
 

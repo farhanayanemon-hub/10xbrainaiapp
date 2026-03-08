@@ -1,7 +1,7 @@
 import { handle as authHandle } from "./auth.js"
 import type { Handle } from "@sveltejs/kit"
 import { sequence } from "@sveltejs/kit/hooks"
-import { settingsStore, getActivePaymentProvider } from '$lib/server/settings-store'
+import { settingsStore } from '$lib/server/settings-store'
 import { storageService } from '$lib/server/storage.js'
 import { paraglideMiddleware } from "./paraglide/server"
 import { db, users } from '$lib/server/db/index.js'
@@ -9,7 +9,6 @@ import { eq } from 'drizzle-orm'
 import type { Session } from "@auth/sveltekit"
 import { securityHeaders } from '$lib/server/security-headers.js'
 import { authRateLimitMiddleware } from '$lib/server/auth-middleware.js'
-import { OpayService } from '$lib/server/opaybd.js'
 
 // Settings handle - loads and caches site settings
 const settingsHandle: Handle = async ({ event, resolve }) => {
@@ -254,70 +253,8 @@ const enhancedAuthHandle: Handle = async ({ event, resolve }) => {
   return response;
 };
 
-// Opaybd renewal check handle - marks expired Opaybd subscriptions for renewal
-//
-// PURPOSE:
-// This middleware periodically checks for expired Opaybd subscriptions and marks them
-// as needing renewal. Unlike Stripe which auto-renews, Opaybd requires manual renewal.
-//
-// WHY IT'S NEEDED:
-// Opaybd doesn't support automatic subscription renewals like Stripe. When a subscription
-// period ends, users must manually renew by making a new payment. This check ensures
-// subscriptions are properly flagged for renewal so the UI can display renewal prompts.
-//
-// HOW IT WORKS:
-// - Uses a cookie-based rate limit (1 check per hour per user session)
-// - Only runs when Opaybd is the active payment provider
-// - Runs in background (non-blocking) to avoid latency
-// - Marks all expired subscriptions with renewalRequired=true
-//
-// PERFORMANCE:
-// - Cookie check is O(1) - no DB query on most requests
-// - Actual renewal check only runs once per hour per session
-// - Background execution means zero latency impact
-//
-const opayRenewalHandle: Handle = async ({ event, resolve }) => {
-  // Only check if Opaybd is the active provider (avoid unnecessary work for Stripe users)
-  try {
-    const activeProvider = await getActivePaymentProvider();
-    if (activeProvider !== 'opaybd') {
-      return resolve(event);
-    }
-  } catch {
-    // If we can't get the provider, skip this check
-    return resolve(event);
-  }
-
-  // Use a cookie to rate-limit the check (once per hour per session)
-  const lastCheck = event.cookies.get('opay_renewal_check');
-  const now = Date.now();
-  const oneHour = 60 * 60 * 1000;
-
-  if (!lastCheck || (now - parseInt(lastCheck)) > oneHour) {
-    // Run renewal check in background (non-blocking)
-    OpayService.markExpiredSubscriptionsForRenewal().catch(error => {
-      // Silent catch - don't affect user experience for background maintenance
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[Opaybd Renewal] Failed to check expired subscriptions:', error.message);
-      }
-    });
-
-    // Update last check timestamp
-    event.cookies.set('opay_renewal_check', now.toString(), {
-      path: '/',
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 3600 // 1 hour
-    });
-  }
-
-  return resolve(event);
-};
-
-// Combine all handles: security headers, auth rate limiting, settings, storage warming, locale default, paraglide, enhanced auth, and opaybd renewal
+// Combine all handles: security headers, auth rate limiting, settings, storage warming, locale default, paraglide, and enhanced auth
 // Storage warming runs after settings to ensure R2 credentials are loaded before storage initialization
-// Opaybd renewal runs after auth to have access to authenticated user context
 export const handle: Handle = sequence(
   securityHeaders,
   authRateLimitMiddleware,
@@ -325,6 +262,5 @@ export const handle: Handle = sequence(
   storageWarmingHandle,
   localeDefaultHandle,
   paraglideHandle,
-  enhancedAuthHandle,
-  opayRenewalHandle
+  enhancedAuthHandle
 )

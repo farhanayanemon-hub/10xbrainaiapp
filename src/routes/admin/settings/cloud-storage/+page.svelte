@@ -21,25 +21,13 @@
   let showAccessKeyId = $state(false);
   let showSecretAccessKey = $state(false);
 
-  // Reactive form values - initialize with current settings or form data
-  let r2AccountId = $state(
-    form?.r2AccountId || data?.settings?.r2AccountId || ""
-  );
-  let r2AccessKeyId = $state(
-    form?.r2AccessKeyId || data?.settings?.r2AccessKeyId || ""
-  );
-  let r2SecretAccessKey = $state(
-    form?.r2SecretAccessKey || data?.settings?.r2SecretAccessKey || ""
-  );
-  let r2BucketName = $state(
-    form?.r2BucketName || data?.settings?.r2BucketName || ""
-  );
-  let r2BrandingBucketName = $state(
-    form?.r2BrandingBucketName || data?.settings?.r2BrandingBucketName || ""
-  );
-  let r2BrandingPublicUrl = $state(
-    form?.r2BrandingPublicUrl || data?.settings?.r2BrandingPublicUrl || ""
-  );
+  // Reactive form values - initialize from server-loaded settings
+  let r2AccountId = $state(data?.settings?.r2AccountId || "");
+  let r2AccessKeyId = $state(data?.settings?.r2AccessKeyId || "");
+  let r2SecretAccessKey = $state(data?.settings?.r2SecretAccessKey || "");
+  let r2BucketName = $state(data?.settings?.r2BucketName || "");
+  let r2BrandingBucketName = $state(data?.settings?.r2BrandingBucketName || "");
+  let r2BrandingPublicUrl = $state(data?.settings?.r2BrandingPublicUrl || "");
 
   // State sync effect
   $effect(() => {
@@ -51,16 +39,6 @@
       r2BucketName = data.settings.r2BucketName || "";
       r2BrandingBucketName = data.settings.r2BrandingBucketName || "";
       r2BrandingPublicUrl = data.settings.r2BrandingPublicUrl || "";
-    }
-
-    // Update from form state if there was a validation error
-    if (form) {
-      r2AccountId = form.r2AccountId || "";
-      r2AccessKeyId = form.r2AccessKeyId || "";
-      r2SecretAccessKey = form.r2SecretAccessKey || "";
-      r2BucketName = form.r2BucketName || "";
-      r2BrandingBucketName = form.r2BrandingBucketName || "";
-      r2BrandingPublicUrl = form.r2BrandingPublicUrl || "";
     }
   });
 

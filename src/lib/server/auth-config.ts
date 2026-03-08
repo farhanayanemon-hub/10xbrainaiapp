@@ -260,13 +260,13 @@ export async function getAuthConfig() {
     while (isConfigLoading) {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    return authConfigCache || createDefaultConfig();
+    return authConfigCache || await createDefaultConfig();
   }
 
   try {
     isConfigLoading = true;
     await refreshAuthConfig();
-    return authConfigCache || createDefaultConfig();
+    return authConfigCache || await createDefaultConfig();
   } finally {
     isConfigLoading = false;
   }
@@ -281,7 +281,7 @@ export async function refreshAuthConfig(): Promise<void> {
 
     const providers = await buildProviders();
 
-    const secureCookieConfig = getSecureCookieConfig();
+    const secureCookieConfig = await getSecureCookieConfig();
     const secureJWTConfig = getSecureJWTConfig();
 
     authConfigCache = {
@@ -382,7 +382,7 @@ export async function refreshAuthConfig(): Promise<void> {
 
     // Use default config if refresh fails
     if (!authConfigCache) {
-      authConfigCache = createDefaultConfig();
+      authConfigCache = await createDefaultConfig();
     }
   }
 }
@@ -399,8 +399,8 @@ export function clearAuthConfigCache(): void {
 /**
  * Create a default Auth.js configuration with environment variable fallbacks
  */
-function createDefaultConfig() {
-  const secureCookieConfig = getSecureCookieConfig();
+async function createDefaultConfig() {
+  const secureCookieConfig = await getSecureCookieConfig();
   const secureJWTConfig = getSecureJWTConfig();
 
   return {

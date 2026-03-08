@@ -37,6 +37,8 @@
   } from "$lib/icons/index.js";
 
   import type { SettingsState } from "$lib/stores/settings.svelte.js";
+  import { untrack } from "svelte";
+  import { page } from "$app/state";
 
   // Import voices from client-safe constants file (for shared getVoiceName helper)
   import { ELEVENLABS_VOICES } from "$lib/constants/elevenlabs.js";
@@ -73,6 +75,9 @@
   let activeMode = $state<
     "tts" | "stt" | "voice_changer" | "music" | "sound_effects"
   >("tts");
+
+  // Track if URL params have been processed (prevents re-processing)
+  let urlParamsProcessed = false;
 
   // Tab button refs for sliding animation
   let tabRefs: Record<string, HTMLButtonElement | null> = $state({
@@ -200,6 +205,41 @@
           wordElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
       }
+    }
+  });
+
+  // Handle URL parameters for prompt pre-fill (from chat "Generate TTS/music" actions)
+  $effect(() => {
+    // Only process URL params once to avoid reactive dependency issues
+    if (urlParamsProcessed) return;
+
+    const prompt = page.url.searchParams.get("prompt");
+    const tab = page.url.searchParams.get("tab") as "tts" | "music" | null;
+
+    if (prompt) {
+      urlParamsProcessed = true;
+      const decodedPrompt = decodeURIComponent(prompt);
+
+      // Use untrack to prevent creating reactive dependencies on state changes
+      untrack(() => {
+        // Set the tab if specified
+        if (tab === "tts" || tab === "music") {
+          activeMode = tab;
+        }
+
+        // Set the prompt on the appropriate state
+        if (tab === "music") {
+          music.inputPrompt = decodedPrompt;
+        } else {
+          tts.inputText = decodedPrompt;
+        }
+      });
+
+      // Clear URL params to keep URL clean (use replaceState to avoid history entry)
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete("prompt");
+      newUrl.searchParams.delete("tab");
+      window.history.replaceState({}, "", newUrl.toString());
     }
   });
 </script>

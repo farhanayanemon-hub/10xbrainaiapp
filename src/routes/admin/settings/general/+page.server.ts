@@ -20,6 +20,7 @@ export const load: PageServerLoad = async () => {
         defaultLanguage: generalSettings.default_language || "en",
         defaultTheme: generalSettings.default_theme || "dark",
         defaultPage: generalSettings.default_page || "landing",
+        publicOrigin: generalSettings.public_origin || "",
         openrouterSystemPrompt: aiModelSettings.openrouter_system_prompt || ""
       },
       isDemoMode: isDemoModeEnabled()
@@ -35,6 +36,7 @@ export const load: PageServerLoad = async () => {
         defaultLanguage: "en",
         defaultTheme: "dark",
         defaultPage: "landing",
+        publicOrigin: "",
         openrouterSystemPrompt: ""
       },
       isDemoMode: isDemoModeEnabled()
@@ -59,6 +61,7 @@ export const actions: Actions = {
     const defaultLanguage = data.get('defaultLanguage')?.toString()
     const defaultTheme = data.get('defaultTheme')?.toString()
     const defaultPage = data.get('defaultPage')?.toString()
+    const publicOrigin = data.get('publicOrigin')?.toString()
     const openrouterSystemPrompt = data.get('openrouterSystemPrompt')?.toString()
 
     // Basic validation
@@ -71,6 +74,7 @@ export const actions: Actions = {
         defaultLanguage,
         defaultTheme,
         defaultPage,
+        publicOrigin,
         openrouterSystemPrompt
       })
     }
@@ -85,12 +89,50 @@ export const actions: Actions = {
         defaultLanguage,
         defaultTheme,
         defaultPage,
+        publicOrigin,
         openrouterSystemPrompt
       })
     }
 
-    // Validate language (must be 'en' or 'de')
-    if (defaultLanguage && !['en', 'de'].includes(defaultLanguage)) {
+    // Validate public origin URL if provided
+    if (publicOrigin && publicOrigin.trim()) {
+      try {
+        const url = new URL(publicOrigin.trim());
+        // Must be http or https
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          return fail(400, {
+            error: 'App domain must use http:// or https:// protocol',
+            siteName,
+            siteTitle,
+            siteDescription,
+            defaultLanguage,
+            defaultTheme,
+            defaultPage,
+            publicOrigin,
+            openrouterSystemPrompt
+          })
+        }
+        // Warn about http in console but allow it (for local dev)
+        if (url.protocol === 'http:' && !publicOrigin.includes('localhost')) {
+          console.warn('[General Settings] Warning: Using http:// for production domain is not recommended');
+        }
+      } catch {
+        return fail(400, {
+          error: 'Invalid App domain URL format. Please enter a valid URL (e.g., https://example.com)',
+          siteName,
+          siteTitle,
+          siteDescription,
+          defaultLanguage,
+          defaultTheme,
+          defaultPage,
+          publicOrigin,
+          openrouterSystemPrompt
+        })
+      }
+    }
+
+    // Validate language (must match available translations)
+    if (defaultLanguage && !['en', 'de', 'es', 'pt', 'ar'].includes(defaultLanguage)) {
       return fail(400, {
         error: 'Invalid language selection',
         siteName,
@@ -99,6 +141,7 @@ export const actions: Actions = {
         defaultLanguage,
         defaultTheme,
         defaultPage,
+        publicOrigin,
         openrouterSystemPrompt
       })
     }
@@ -113,6 +156,7 @@ export const actions: Actions = {
         defaultLanguage,
         defaultTheme,
         defaultPage,
+        publicOrigin,
         openrouterSystemPrompt
       })
     }
@@ -127,6 +171,7 @@ export const actions: Actions = {
         defaultLanguage,
         defaultTheme,
         defaultPage,
+        publicOrigin,
         openrouterSystemPrompt
       })
     }
@@ -166,6 +211,25 @@ export const actions: Actions = {
       }
       if (shouldSaveValue(defaultPage, currentSettings.default_page)) {
         settingsToSave.push({ key: 'default_page', value: defaultPage!.trim(), category: 'general', description: 'Default page when visiting the root URL' });
+      }
+
+      // Handle public origin - normalize (remove trailing slash), allows empty to revert to env fallback
+      const normalizedOrigin = (publicOrigin || '').trim().replace(/\/+$/, '');
+      const currentOrigin = (currentSettings.public_origin || '').trim();
+
+      if (normalizedOrigin !== currentOrigin) {
+        if (normalizedOrigin) {
+          // Non-empty: save the new value
+          settingsToSave.push({
+            key: 'public_origin',
+            value: normalizedOrigin,
+            category: 'general',
+            description: 'Public URL of the application for email links and security'
+          });
+        } else if (currentOrigin) {
+          // Empty but had a value before: delete to revert to env fallback
+          await adminSettingsService.deleteSetting('public_origin');
+        }
       }
 
       // Handle system prompt - stored in ai_models category (allows empty to clear/disable)
@@ -211,6 +275,7 @@ export const actions: Actions = {
         defaultLanguage: updatedSettings.default_language || 'en',
         defaultTheme: updatedSettings.default_theme || 'dark',
         defaultPage: updatedSettings.default_page || 'landing',
+        publicOrigin: updatedSettings.public_origin || '',
         openrouterSystemPrompt: updatedAISettings.openrouter_system_prompt || ''
       }
     } catch (error) {
@@ -223,6 +288,7 @@ export const actions: Actions = {
         defaultLanguage,
         defaultTheme,
         defaultPage,
+        publicOrigin,
         openrouterSystemPrompt
       })
     }

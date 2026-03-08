@@ -1,5 +1,6 @@
 import type { Handle } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { getPublicOrigin } from './settings-store.js';
 
 /**
  * Security headers middleware for comprehensive protection
@@ -176,7 +177,7 @@ export const securityHeaders: Handle = async ({ event, resolve }) => {
  * Validate and sanitize redirect URLs for security
  * Prevents open redirect vulnerabilities
  */
-export function validateRedirectUrl(url: string | null | undefined, defaultUrl: string = '/'): string {
+export async function validateRedirectUrl(url: string | null | undefined, defaultUrl: string = '/'): Promise<string> {
   if (!url || typeof url !== 'string') {
     return defaultUrl;
   }
@@ -192,7 +193,7 @@ export function validateRedirectUrl(url: string | null | undefined, defaultUrl: 
     }
 
     // For absolute URLs, check if they're same-origin
-    const currentOrigin = env.PUBLIC_ORIGIN || 'http://localhost:5173';
+    const currentOrigin = await getPublicOrigin();
     const currentUrl = new URL(currentOrigin);
 
     if (parsedUrl.origin === currentUrl.origin) {

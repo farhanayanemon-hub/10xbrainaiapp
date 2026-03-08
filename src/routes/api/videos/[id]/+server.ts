@@ -4,6 +4,7 @@ import { db } from '$lib/server/db/index.js';
 import { videos } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { storageService } from '$lib/server/storage.js';
+import { isDemoModeRestricted, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
 
 // Get video by ID (secure with authentication and authorization)
 export const GET: RequestHandler = async ({ params, locals }) => {
@@ -82,5 +83,73 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 			throw err;
 		}
 		throw error(500, 'Failed to retrieve video');
+	}
+};
+
+// Delete video by ID (secure with authentication and authorization)
+export const DELETE: RequestHandler = async ({ params, locals }) => {
+	try {
+		// Check authentication
+		const session = await locals.auth();
+		if (!session?.user?.id) {
+			throw error(401, 'Authentication required');
+		}
+
+		// Check demo mode restrictions
+		if (isDemoModeRestricted(!!session?.user?.id)) {
+			throw error(403, DEMO_MODE_MESSAGES.GENERAL_RESTRICTION);
+		}
+
+		const videoId = params.id;
+
+		if (!videoId) {
+			throw error(400, 'Video ID is required');
+		}
+
+		// Validate video ID format (UUID format for database IDs)
+		if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(videoId)) {
+			throw error(400, 'Invalid video ID format');
+		}
+
+		// Query database to get video metadata and verify ownership
+		const [videoRecord] = await db
+			.select()
+			.from(videos)
+			.where(eq(videos.id, videoId));
+
+		if (!videoRecord) {
+			throw error(404, 'Video not found');
+		}
+
+		// Check authorization - user can only delete their own videos
+		if (videoRecord.userId !== session.user.id) {
+			throw error(403, 'Access denied - you can only delete your own videos');
+		}
+
+		// Delete from storage if cloudPath exists
+		if (videoRecord.cloudPath) {
+			try {
+				await storageService.delete(videoRecord.cloudPath);
+			} catch (storageError) {
+				console.error('Storage deletion error:', storageError);
+				// Continue with database deletion even if storage deletion fails
+			}
+		}
+
+		// Delete from database
+		await db.delete(videos).where(eq(videos.id, videoId));
+
+		return new Response(JSON.stringify({ success: true, message: 'Video deleted successfully' }), {
+			status: 200,
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	} catch (err) {
+		console.error('Video deletion error:', err);
+		if (err instanceof Error && 'status' in err) {
+			throw err;
+		}
+		throw error(500, 'Failed to delete video');
 	}
 };

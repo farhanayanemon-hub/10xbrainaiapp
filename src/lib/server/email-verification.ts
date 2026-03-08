@@ -1,8 +1,8 @@
 import { randomBytes } from 'crypto'
 import { db, users, verificationTokens } from './db/index.js'
 import { eq, lt } from 'drizzle-orm'
-import { env } from '$env/dynamic/private'
 import { AUTH_ERRORS, sanitizeErrorForLogging } from '../utils/error-handling.js'
+import { getPublicOrigin } from './settings-store.js'
 
 /**
  * Result of creating a verification token
@@ -199,8 +199,8 @@ class EmailVerificationService {
   }
 
   // Generate verification URL
-  generateVerificationUrl(token: string): string {
-    const baseUrl = env.PUBLIC_ORIGIN || 'http://localhost:5173'
+  async generateVerificationUrl(token: string): Promise<string> {
+    const baseUrl = await getPublicOrigin()
     return `${baseUrl}/verify-email?token=${token}`
   }
 
@@ -249,7 +249,7 @@ export const createVerificationToken = (userEmail: string) =>
 export const verifyToken = (token: string) =>
   emailVerificationService.verifyToken(token)
 
-export const generateVerificationUrl = (token: string) =>
+export const generateVerificationUrl = async (token: string) =>
   emailVerificationService.generateVerificationUrl(token)
 
 export const isEmailVerified = (userEmail: string) =>

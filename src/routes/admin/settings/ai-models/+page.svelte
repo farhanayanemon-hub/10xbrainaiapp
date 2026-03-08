@@ -20,22 +20,12 @@
   let isSubmitting = $state(false);
   let showOpenRouterKey = $state(false);
   let showReplicateKey = $state(false);
-  let showOpenAIKey = $state(false);
   let showElevenLabsKey = $state(false);
 
-  // Reactive form values - initialize with current settings or form data
-  let openrouterApiKey = $state(
-    form?.openrouterApiKey || data?.settings?.openrouterApiKey || ""
-  );
-  let replicateApiKey = $state(
-    form?.replicateApiKey || data?.settings?.replicateApiKey || ""
-  );
-  let openaiApiKey = $state(
-    form?.openaiApiKey || data?.settings?.openaiApiKey || ""
-  );
-  let elevenlabsApiKey = $state(
-    form?.elevenlabsApiKey || data?.settings?.elevenlabsApiKey || ""
-  );
+  // Reactive form values - initialize from server-loaded settings
+  let openrouterApiKey = $state(data?.settings?.openrouterApiKey || "");
+  let replicateApiKey = $state(data?.settings?.replicateApiKey || "");
+  let elevenlabsApiKey = $state(data?.settings?.elevenlabsApiKey || "");
 
   // Derived display values for password fields
   $effect(() => {
@@ -43,7 +33,6 @@
     if (data?.settings && !form) {
       openrouterApiKey = data.settings.openrouterApiKey || "";
       replicateApiKey = data.settings.replicateApiKey || "";
-      openaiApiKey = data.settings.openaiApiKey || "";
       elevenlabsApiKey = data.settings.elevenlabsApiKey || "";
     }
   });
@@ -55,10 +44,6 @@
 
   function isReplicateConfigured() {
     return replicateApiKey;
-  }
-
-  function isOpenAIConfigured() {
-    return openaiApiKey;
   }
 
   function isElevenLabsConfigured() {
@@ -295,95 +280,6 @@
               >Cloud Storage</a
             > first. Cloud Storage is required since Local Storage cannot be used
             if the app is hosted on a serverless platform (e.g. Vercel).
-          </p>
-        </div>
-      </Card.Content>
-    </Card.Root>
-
-    <!-- OpenAI Configuration -->
-    <Card.Root>
-      <Card.Header>
-        <div class="flex items-center justify-between">
-          <div>
-            <Card.Title class="flex items-center gap-2">
-              <div
-                class="w-6 h-6 bg-green-600 rounded flex items-center justify-center"
-              >
-                <span class="text-white text-xs font-bold">AI</span>
-              </div>
-              OpenAI
-              {#if isOpenAIConfigured()}
-                <CheckCircleIcon class="w-4 h-4 text-green-500" />
-              {/if}
-            </Card.Title>
-            <Card.Description
-              >Only required for specific OpenAI image generation models via
-              Replicate (GPT-IMAGE-1 and GPT-IMAGE-1-MINI)</Card.Description
-            >
-          </div>
-        </div>
-      </Card.Header>
-      <Card.Content class="space-y-4">
-        <div class="p-3 bg-gray-50 border border-gray-200 rounded-md">
-          <h4 class="font-medium text-gray-800 mb-2">Setup Instructions:</h4>
-          <ol class="text-sm text-gray-700 space-y-1 list-decimal list-inside">
-            <li>
-              Go to <a
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                class="underline inline-flex items-center gap-1"
-                >OpenAI API Keys <ExternalLinkIcon class="w-3 h-3" /></a
-              >
-            </li>
-            <li>Sign up or log in to your account</li>
-            <li>Create a new secret API key</li>
-            <li>Copy the key and paste it below</li>
-          </ol>
-        </div>
-
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <Label for="openaiApiKey">OpenAI API Key</Label>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onclick={() => (showOpenAIKey = !showOpenAIKey)}
-              class="h-auto p-1"
-              disabled={data.isDemoMode}
-            >
-              {#if showOpenAIKey}
-                <EyeOffIcon class="w-4 h-4" />
-              {:else}
-                <EyeIcon class="w-4 h-4" />
-              {/if}
-            </Button>
-          </div>
-          <Input
-            id="openaiApiKey"
-            name="openaiApiKey"
-            type={showOpenAIKey ? "text" : "password"}
-            placeholder="sk-proj-..."
-            bind:value={openaiApiKey}
-            class="font-mono"
-            disabled={data.isDemoMode}
-          />
-          <p class="text-xs text-muted-foreground">
-            Required for OpenAI image generation models accessed through
-            Replicate (gpt-image-1 and gpt-image-1-mini). This key is passed as
-            a body parameter to Replicate for these specific models.
-          </p>
-          <p class="text-xs text-muted-foreground">
-            If you see the error: "your organization must be verified to use the
-            model" please go to <a
-              class="underline font-bold"
-              target="_blank"
-              href="https://platform.openai.com/settings/organization/general"
-              >OpenAI Organization Settings</a
-            >
-            and click on <span class="font-bold">Verify Organization</span>. If
-            you just verified, it can take up to 15 minutes for access to
-            propagate.
           </p>
         </div>
       </Card.Content>

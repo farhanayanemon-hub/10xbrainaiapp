@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types.js';
 import { getModelProvider } from '$lib/ai/index.js';
 import type { AIResponse, AIImageResponse, AIMessage } from '$lib/ai/types.js';
+import { isDemoModeRestricted, isModelAllowedForDemo, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -13,6 +14,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		const body = await request.json();
 		const { model, messages, maxTokens, temperature } = body;
+
+		// Check demo mode restrictions
+		if (isDemoModeRestricted(!!session?.user?.id)) {
+			if (!isModelAllowedForDemo(model)) {
+				return json({ error: DEMO_MODE_MESSAGES.MODEL_RESTRICTED, type: 'demo_model_restricted' }, { status: 403 });
+			}
+		}
 
 		if (!model) {
 			return json({ error: 'Model is required' }, { status: 400 });

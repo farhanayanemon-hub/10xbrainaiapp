@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
   return {
     settings: {
-      siteName: settings.siteName || 'AI Models Platform',
+      siteName: settings.siteName || 'AI Chat Interface',
       siteDescription: settings.siteDescription || 'Reset your password'
     }
   }
@@ -53,7 +53,7 @@ export const actions = {
       const { token } = await createPasswordResetToken(email)
 
       // Generate reset URL
-      const resetUrl = generateResetUrl(token)
+      const resetUrl = await generateResetUrl(token)
 
       // Send password reset email
       const emailSent = await sendPasswordResetEmail({

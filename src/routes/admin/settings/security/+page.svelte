@@ -15,16 +15,10 @@
   let isSubmitting = $state(false);
   let showSecretKey = $state(false);
 
-  // Reactive form values - initialize with current settings or form data
-  let turnstileEnabled = $state(
-    form?.turnstileEnabled ?? data?.settings?.turnstileEnabled ?? false
-  );
-  let turnstileSiteKey = $state(
-    form?.turnstileSiteKey || data?.settings?.turnstileSiteKey || ""
-  );
-  let turnstileSecretKey = $state(
-    form?.turnstileSecretKey || data?.settings?.turnstileSecretKey || ""
-  );
+  // Reactive form values - initialize from server-loaded settings
+  let turnstileEnabled = $state(data?.settings?.turnstileEnabled ?? false);
+  let turnstileSiteKey = $state(data?.settings?.turnstileSiteKey || "");
+  let turnstileSecretKey = $state(data?.settings?.turnstileSecretKey || "");
 
   // Derived state to check if keys are present in saved database state (not form inputs)
   let hasKeys = $derived(

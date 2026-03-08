@@ -6,15 +6,16 @@
   import { page } from "$app/state";
   import { ModeWatcher } from "mode-watcher";
   import { Toaster } from "$lib/components/ui/sonner";
+  import { getLocale } from "../paraglide/runtime.js";
 
   // UI Components
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+  import * as Tooltip from "$lib/components/ui/tooltip/index.js";
 
   // Shared components
   import ChatSidebar from "$lib/components/ChatSidebar.svelte";
   import Header from "$lib/components/Header.svelte";
   import Favicon from "$lib/components/Favicon.svelte";
-  import RenewalBanner from "$lib/components/RenewalBanner.svelte";
   import { ChatState } from "$lib/components/chat-state.svelte.js";
   import { SettingsState } from "$lib/stores/settings.svelte.js";
 
@@ -30,9 +31,14 @@
     }
   });
 
-  // Check if current route is an auth route (login/register/reset-password/verify-email), standalone page (pricing, landing page at /), or admin route
+  // Check if current route is a fully standalone page (no header, no sidebar)
   const isStandalonePage = $derived(
     page.url.pathname === "/" || page.url.pathname === "/login" || page.url.pathname === "/register" || page.url.pathname === "/pricing" || page.url.pathname === "/terms" || page.url.pathname === "/privacy" || page.url.pathname.startsWith("/admin") || page.url.pathname === "/reset-password" || page.url.pathname.startsWith("/reset-password/") || page.url.pathname === "/verify-email" || page.url.pathname.startsWith("/verify-email/")
+  );
+
+  // Check if current route should have header but no sidebar
+  const isHeaderOnlyPage = $derived(
+    page.url.pathname === "/image-video"
   );
 
   // Create global chat state that persists across route changes
@@ -66,6 +72,16 @@
       }
     }
   });
+
+  // RTL detection and direction switching based on language
+  $effect(() => {
+    if (browser) {
+      const locale = getLocale();
+      const isRTL = locale === 'ar';
+      document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+      document.documentElement.lang = locale;
+    }
+  });
 </script>
 
 <ModeWatcher defaultMode={(data.adminDefaults?.theme as "system" | "dark" | "light" | undefined) || "dark"} disableTransitions={false} />
@@ -74,10 +90,20 @@
 <Favicon />
 
 {#if isStandalonePage}
-  <!-- Standalone pages without sidebar (auth, pricing) -->
+  <!-- Standalone pages without header or sidebar (auth, pricing, landing) -->
   {@render children()}
+{:else if isHeaderOnlyPage}
+  <!-- Pages with header but no sidebar (image-video) -->
+  <Tooltip.Provider>
+    <div class="flex flex-col h-screen w-full">
+      <Header {data} showSidebarTrigger={false} />
+      <div class="flex-1 overflow-auto">
+        {@render children()}
+      </div>
+    </div>
+  </Tooltip.Provider>
 {:else}
-  <!-- Main app with sidebar -->
+  <!-- Main app with sidebar and header -->
   <Sidebar.Provider>
     <!-- Global Sidebar that persists across routes -->
     <ChatSidebar {chatState} />
@@ -86,13 +112,6 @@
     <div class="flex flex-col h-screen w-full">
       <!-- Global Header -->
       <Header {data} />
-
-      <!-- Renewal Banner for Opaybd subscriptions -->
-      {#if data.renewalInfo?.needsRenewal}
-        <div class="px-4 pt-2">
-          <RenewalBanner renewal={data.renewalInfo} />
-        </div>
-      {/if}
 
       <!-- Page content area -->
       <div class="flex-1 overflow-auto">

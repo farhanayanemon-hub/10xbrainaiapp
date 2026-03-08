@@ -3,7 +3,6 @@ import { getPricingPlans } from '$lib/server/pricing-plans-seeder.js';
 import { StripeService } from '$lib/server/stripe.js';
 import { db, users } from '$lib/server/db/index.js';
 import { eq } from 'drizzle-orm';
-import { getActivePaymentProvider } from '$lib/server/settings-store.js';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const session = await locals.auth();
@@ -11,10 +10,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	try {
 		// Get all pricing plans
 		const plans = await getPricingPlans();
-
-		// Get active payment provider (stripe or opaybd)
-		const activePaymentProvider = await getActivePaymentProvider();
-
+		
 		// Get current user's subscription and user data if logged in
 		let currentSubscription = null;
 		let userData = null;
@@ -30,7 +26,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 			currentSubscription,
 			user: session?.user || null,
 			userData, // Include full user data with planTier
-			activePaymentProvider,
 		};
 	} catch (error) {
 		console.error('Error loading pricing data:', error);
@@ -39,7 +34,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 			currentSubscription: null,
 			user: session?.user || null,
 			userData: null,
-			activePaymentProvider: 'stripe' as const,
 		};
 	}
 };

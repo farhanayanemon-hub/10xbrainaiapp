@@ -39,7 +39,8 @@ export const ELEVENLABS_VOICES = [
 // ElevenLabs STT Models
 // These are the available speech-to-text models
 export const ELEVENLABS_STT_MODELS = [
-	{ id: 'scribe_v1', name: 'Scribe v1' }
+	{ id: 'scribe_v1', name: 'Scribe v1' },
+	{ id: 'scribe_v2', name: 'Scribe v2' }
 ] as const;
 
 // ElevenLabs STS (Speech-to-Speech) Models
@@ -68,3 +69,18 @@ export type ElevenLabsSTTModel = (typeof ELEVENLABS_STT_MODELS)[number];
 export type ElevenLabsSTSModel = (typeof ELEVENLABS_STS_MODELS)[number];
 export type ElevenLabsMusicModel = (typeof ELEVENLABS_MUSIC_MODELS)[number];
 export type ElevenLabsSoundEffectsModel = (typeof ELEVENLABS_SOUND_EFFECTS_MODELS)[number];
+
+// Read Aloud feature defaults (used by both client and server)
+// Single source of truth for the chat Read Aloud functionality
+export const READ_ALOUD_DEFAULTS = {
+	model: 'eleven_multilingual_v2',
+	voiceId: 'FGY2WhTYpPnrIDTdsKH5', // Laura voice
+	voiceSettings: {
+		stability: 0.5,
+		similarityBoost: 0.75,
+		style: 0,
+		useSpeakerBoost: true,
+		speed: 1,
+	},
+	maxTextLength: 5000, // ElevenLabs limit
+} as const;

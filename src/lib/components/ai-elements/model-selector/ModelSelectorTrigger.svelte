@@ -1,0 +1,20 @@
+<script lang="ts">
+	import * as Dialog from "$lib/components/ui/dialog/index.js";
+	import type { Dialog as DialogPrimitive } from "bits-ui";
+	import type { WithoutChildrenOrChild } from "$lib/utils.js";
+	import type { Snippet } from "svelte";
+
+	let {
+		ref = $bindable(null),
+		children,
+		...restProps
+	}: WithoutChildrenOrChild<DialogPrimitive.TriggerProps> & {
+		children: Snippet<[Record<string, unknown>]>;
+	} = $props();
+</script>
+
+<Dialog.Trigger bind:ref {...restProps}>
+	{#snippet child({ props: triggerProps })}
+		{@render children(triggerProps)}
+	{/snippet}
+</Dialog.Trigger>

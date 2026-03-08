@@ -158,7 +158,7 @@ export const actions: Actions = {
         try {
           // Create verification token for email/password registration
           const { token } = await createVerificationToken(userData.email!)
-          const verificationUrl = generateVerificationUrl(token)
+          const verificationUrl = await generateVerificationUrl(token)
 
           // Send welcome email with verification link
           await sendWelcomeEmail({

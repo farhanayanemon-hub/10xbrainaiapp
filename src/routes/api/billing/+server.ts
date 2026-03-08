@@ -13,9 +13,16 @@ export const GET: RequestHandler = async ({ locals }) => {
 			return error(401, 'Unauthorized');
 		}
 
-		// Get user data
+		// Get user data (select only needed fields - never expose password hash)
 		const [user] = await db
-			.select()
+			.select({
+				id: users.id,
+				name: users.name,
+				email: users.email,
+				planTier: users.planTier,
+				subscriptionStatus: users.subscriptionStatus,
+				stripeCustomerId: users.stripeCustomerId,
+			})
 			.from(users)
 			.where(eq(users.id, session.user.id));
 

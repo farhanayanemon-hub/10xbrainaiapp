@@ -6,21 +6,9 @@ export interface ArchitectureObject {
 	instruct_type: string | null; // Instruction format type, can be null
 }
 
-// Tool calling interfaces
-// NOTE: AITool is kept for API compatibility but tools are now created using AI SDK v5's tool() helper
-// See src/lib/ai/tools/* for actual tool implementations using AI SDK v5
-export interface AITool {
-	type: 'function';
-	function: {
-		name: string;
-		description: string;
-		parameters: {
-			type: 'object';
-			properties: Record<string, any>;
-			required?: string[];
-		};
-	};
-}
+// Tool calling interfaces (AI SDK v6)
+// Tools are now defined using AI SDK v6's tool() helper with inputSchema
+// See src/lib/ai/tools/* for actual tool implementations
 
 export interface AIToolCall {
 	id: string;
@@ -59,6 +47,15 @@ export interface AIMessage {
 	tool_calls?: AIToolCall[];
 	tool_call_id?: string; // For tool result messages
 	name?: string; // Tool name for tool result messages
+	// Tool invocations for UI display (persisted after streaming)
+	toolInvocations?: Array<{
+		toolCallId: string;
+		toolName: string;
+		args: Record<string, unknown>;
+		state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+		result?: unknown;
+		error?: string;
+	}>;
 }
 
 export interface AIModelConfig {
@@ -100,6 +97,19 @@ export interface AIStreamChunk {
 	content: string;
 	done: boolean;
 	usage?: AIResponse['usage'];
+	// Tool support for streaming
+	type?: 'text' | 'tool-call' | 'tool-result' | 'finish' | 'error';
+	toolCall?: {
+		toolCallId: string;
+		toolName: string;
+		args: Record<string, unknown>;
+	};
+	toolResult?: {
+		toolCallId: string;
+		toolName: string;
+		result: unknown;
+	};
+	finishReason?: string;
 }
 
 export interface AIProvider {
@@ -113,7 +123,10 @@ export interface AIProvider {
 		stream?: boolean;
 		userId?: string;
 		chatId?: string;
-		tools?: AITool[];
+		/** Tool names to enable for this request */
+		toolNames?: string[];
+		/** Maximum steps for multi-step tool execution (default: 1) */
+		maxSteps?: number;
 	}): Promise<AIResponse | AsyncIterableIterator<AIStreamChunk>>;
 	generateImage?(params: ImageGenerationParams): Promise<AIImageResponse | AsyncIterableIterator<AIImageStreamChunk>>;
 	generateVideo?(params: VideoGenerationParams): Promise<AIVideoResponse>;
@@ -127,19 +140,12 @@ export interface AIProvider {
 		temperature?: number;
 		userId?: string;
 		chatId?: string;
-		tools?: AITool[];
+		/** Tool names to enable for this request */
+		toolNames?: string[];
+		/** Maximum steps for multi-step tool execution (default: 1) */
+		maxSteps?: number;
 		stream?: boolean;
 	}): Promise<AIResponse | AIImageResponse | AIVideoResponse | AsyncIterableIterator<AIStreamChunk>>;
-	// New method specifically for tool calling
-	chatWithTools?(params: {
-		model: string;
-		messages: AIMessage[];
-		tools: AITool[];
-		maxTokens?: number;
-		temperature?: number;
-		userId?: string;
-		chatId?: string;
-	}): Promise<AIResponse>;
 }
 
 export interface ChatCompletionParams {
@@ -150,7 +156,10 @@ export interface ChatCompletionParams {
 	stream?: boolean;
 	userId?: string;
 	chatId?: string;
-	tools?: AITool[];
+	/** Tool names to enable for this request */
+	toolNames?: string[];
+	/** Maximum steps for multi-step tool execution (default: 1) */
+	maxSteps?: number;
 }
 
 export interface AIImageResponse {
@@ -170,15 +179,19 @@ export interface AIImageResponse {
 export interface ImageGenerationParams {
 	model: string;
 	prompt: string;
-	quality?: 'standard' | 'hd';
+	quality?: string; // Model-specific quality options (e.g., 'low', 'medium', 'high' or '720p', '1080p', '4K')
 	size?: string;
-	style?: string;
+	style?: string; // Model-specific style options (e.g., 'anime', 'photorealistic', 'digital-art')
+	numberOfImages?: number; // Number of images to generate
 	userId?: string;
 	chatId?: string;
 	stream?: boolean; // Support for streaming image generation
 	partial_images?: number; // Number of partial images to generate during streaming
-	imageUrl?: string; // Reference image URL for image-to-image generation
+	imageUrl?: string; // Reference image URL for image-to-image generation (single image, backward compatible)
+	imageUrls?: string[]; // Multiple reference image URLs for models that support multiple inputs
 	seed?: number; // Random seed for reproducible generation
+	upscaleFactor?: string; // Upscale factor for upscaler models (e.g., 'x2', 'x4')
+	compressionQuality?: number; // Compression quality for upscaler models (e.g., 1-100)
 }
 
 export interface AIImageStreamChunk {
@@ -211,7 +224,11 @@ export interface VideoGenerationParams {
 	duration?: number; // Duration in seconds (default 8 for Veo 3)
 	resolution?: string; // e.g., '720p'
 	fps?: number; // Frames per second (default 24 for Veo 3)
-	imageUrl?: string; // Image URL for image-to-video models (i2v)
+	quality?: string; // Model-specific quality options (e.g., 'low', 'medium', 'high' or '720p', '1080p', '4K')
+	style?: string; // Model-specific style options
+	imageUrl?: string; // Image URL for image-to-video models (i2v) - legacy param for backwards compatibility
+	imageStartUrl?: string; // Image URL for the first frame of the video
+	imageEndUrl?: string; // Image URL for the last frame of the video
 	userId?: string;
 	chatId?: string;
 	seed?: number; // Random seed for reproducible generation

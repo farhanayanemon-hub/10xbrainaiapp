@@ -27,7 +27,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     token,
     userEmail: validation.userEmail,
     settings: {
-      siteName: settings.siteName || 'AI Models Platform',
+      siteName: settings.siteName || 'AI Chat Interface',
       siteDescription: settings.siteDescription || 'Set your new password'
     }
   }

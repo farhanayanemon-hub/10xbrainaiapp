@@ -7,7 +7,8 @@ import { storageService } from '$lib/server/storage.js';
 import { isDemoModeRestricted, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
 
 // Get audio by ID (secure with authentication and authorization)
-export const GET: RequestHandler = async ({ params, locals }) => {
+// Supports HTTP Range requests for audio streaming/seeking
+export const GET: RequestHandler = async ({ params, locals, request }) => {
 	try {
 		// Check authentication
 		const session = await locals.auth();
@@ -64,12 +65,52 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
 		try {
 			const audioData = await storageService.download(storagePath);
+			const totalSize = audioData.length;
 
+			// Check for Range header to support audio seeking/streaming
+			const rangeHeader = request.headers.get('range');
+
+			if (rangeHeader) {
+				// Parse Range header (e.g., "bytes=0-1023" or "bytes=1024-")
+				const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+
+				if (match) {
+					const start = parseInt(match[1], 10);
+					const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+
+					// Validate range
+					if (start >= totalSize || start > end) {
+						return new Response(null, {
+							status: 416, // Range Not Satisfiable
+							headers: {
+								'Content-Range': `bytes */${totalSize}`
+							}
+						});
+					}
+
+					const chunkSize = end - start + 1;
+					const chunk = audioData.subarray(start, end + 1);
+
+					return new Response(new Uint8Array(chunk), {
+						status: 206, // Partial Content
+						headers: {
+							'Content-Type': audioRecord.mimeType,
+							'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+							'Content-Length': chunkSize.toString(),
+							'Accept-Ranges': 'bytes',
+							'Cache-Control': 'private, max-age=3600'
+						}
+					});
+				}
+			}
+
+			// Full response (no Range header or invalid format)
 			return new Response(new Uint8Array(audioData), {
 				headers: {
 					'Content-Type': audioRecord.mimeType,
 					'Cache-Control': 'private, max-age=3600', // Private cache for 1 hour
-					'Content-Length': audioData.length.toString()
+					'Content-Length': totalSize.toString(),
+					'Accept-Ranges': 'bytes' // Enable range requests for audio streaming
 				}
 			});
 		} catch (storageError) {

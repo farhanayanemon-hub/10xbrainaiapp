@@ -1,8 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types.js';
 import { getModelProvider } from '$lib/ai/index.js';
-import type { AIMessage, AITool } from '$lib/ai/types.js';
-import { getAllTools, getTools } from '$lib/ai/tools/index.js';
+import type { AIMessage } from '$lib/ai/types.js';
 import { UsageTrackingService, UsageLimitError } from '$lib/server/usage-tracking.js';
 import { GUEST_MESSAGE_LIMIT, isModelAllowedForGuests } from '$lib/constants/guest-limits.js';
 import { isDemoModeRestricted, isModelAllowedForDemo, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
@@ -10,7 +9,7 @@ import { isDemoModeRestricted, isModelAllowedForDemo, DEMO_MODE_MESSAGES } from 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const body = await request.json();
-		const { model, messages, maxTokens, temperature, stream, userId, chatId, multimodal, selectedTool, tools } = body;
+		const { model, messages, maxTokens, temperature, stream, userId, chatId, multimodal, selectedTool, maxSteps } = body;
 
 		if (!model) {
 			return json({ error: 'Model is required' }, { status: 400 });
@@ -79,21 +78,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		// Find the model configuration to check its capabilities
 		const modelConfig = provider.models.find(m => m.name === model);
 
-		// Determine which tools to use (as tool names)
-		let toolsToUse: AITool[] = [];
+		// Tool handling (AI SDK v6): use tool names directly
+		let toolNames: string[] = [];
 		if (selectedTool) {
-			// Single tool selected via UI - create AITool wrapper with tool name for compatibility
-			toolsToUse = [{ type: 'function', function: { name: selectedTool, description: '', parameters: { type: 'object', properties: {} } } }];
+			toolNames = [selectedTool];
 			console.log(`Using selected tool: ${selectedTool}`);
-		} else if (tools && Array.isArray(tools)) {
-			// Tools explicitly provided in request
-			toolsToUse = tools;
 		}
 
 		// Check if model supports functions when tools are requested
-		if (toolsToUse.length > 0 && !modelConfig?.supportsFunctions) {
+		if (toolNames.length > 0 && !modelConfig?.supportsFunctions) {
 			console.warn(`Model ${model} does not support functions, tools will be ignored`);
-			toolsToUse = [];
+			toolNames = [];
 		}
 
 		// Check if this is a multimodal request or if any messages contain images
@@ -119,7 +114,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					temperature,
 					userId,
 					chatId,
-					tools: toolsToUse.length > 0 ? toolsToUse : undefined
+					toolNames: toolNames.length > 0 ? toolNames : undefined,
+					maxSteps
 				});
 
 				// Track usage for successful multimodal request
@@ -193,7 +189,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			stream,
 			userId,
 			chatId,
-			tools: toolsToUse.length > 0 ? toolsToUse : undefined
+			toolNames: toolNames.length > 0 ? toolNames : undefined,
+			maxSteps
 		});
 
 		if (stream) {

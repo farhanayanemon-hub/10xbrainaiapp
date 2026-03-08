@@ -1,8 +1,8 @@
 import { randomBytes } from 'crypto'
 import { db, users, passwordResetTokens } from './db/index.js'
 import { eq, lt, gt, and } from 'drizzle-orm'
-import { env } from '$env/dynamic/private'
 import bcrypt from 'bcryptjs'
+import { getPublicOrigin } from './settings-store.js'
 
 /**
  * Result of creating a password reset token
@@ -286,8 +286,8 @@ class PasswordResetService {
    * @param token - Reset token
    * @returns Reset URL
    */
-  generateResetUrl(token: string): string {
-    const baseUrl = env.PUBLIC_ORIGIN || 'http://localhost:5173'
+  async generateResetUrl(token: string): Promise<string> {
+    const baseUrl = await getPublicOrigin()
     return `${baseUrl}/reset-password/${token}`
   }
 
@@ -337,7 +337,7 @@ export const validateResetToken = (token: string) =>
 export const resetPassword = (token: string, newPassword: string) =>
   passwordResetService.resetPassword(token, newPassword)
 
-export const generateResetUrl = (token: string) =>
+export const generateResetUrl = async (token: string) =>
   passwordResetService.generateResetUrl(token)
 
 export const getUserForReset = (userEmail: string) =>

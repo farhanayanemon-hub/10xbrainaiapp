@@ -10,15 +10,13 @@ export interface CachedSettings {
   defaultLanguage: string;
   defaultTheme: string;
   defaultPage: string;
+  publicOrigin: string;
 
   // Payment settings
   paymentEnvironment: string;
-  activePaymentProvider: 'stripe' | 'opaybd';
   stripePublishableKey: string;
   stripeSecretKey: string;
   stripeWebhookSecret: string;
-  // Opaybd settings
-  opayApiKey: string;
 
   // OAuth settings
   googleEnabled: boolean;
@@ -38,7 +36,6 @@ export interface CachedSettings {
   openrouterApiKey: string;
   openrouterSystemPrompt: string;
   replicateApiKey: string;
-  openaiApiKey: string;
   elevenlabsApiKey: string;
 
   // Cloud Storage settings
@@ -67,6 +64,67 @@ export interface CachedSettings {
   isFallback?: boolean; // Indicates if these are default/fallback settings due to database error
 }
 
+/**
+ * Client-safe subset of settings that can be serialized to the browser.
+ * NEVER add secret keys, API keys, or credentials to this interface.
+ */
+export interface PublicSettings {
+  siteName: string;
+  siteTitle: string;
+  siteDescription: string;
+  defaultLanguage: string;
+  defaultTheme: string;
+  defaultPage: string;
+  publicOrigin: string;
+  paymentEnvironment: string;
+  stripePublishableKey: string; // pk_test_* / pk_live_* - designed for client use
+  googleEnabled: boolean;
+  appleEnabled: boolean;
+  twitterEnabled: boolean;
+  facebookEnabled: boolean;
+  openrouterSystemPrompt: string;
+  turnstileSiteKey: string; // Public site key - designed for client use
+  logoUrlDark: string;
+  logoUrlLight: string;
+  logoWidth: string;
+  logoHeight: string;
+  currentFavicon: string | null;
+  lastUpdated: Date;
+  isFallback?: boolean;
+}
+
+/**
+ * Extract only client-safe fields from CachedSettings.
+ * This MUST be used before returning settings to the client to prevent
+ * exposing server-side secrets (API keys, OAuth secrets, storage credentials).
+ */
+export function toPublicSettings(settings: CachedSettings): PublicSettings {
+  return {
+    siteName: settings.siteName,
+    siteTitle: settings.siteTitle,
+    siteDescription: settings.siteDescription,
+    defaultLanguage: settings.defaultLanguage,
+    defaultTheme: settings.defaultTheme,
+    defaultPage: settings.defaultPage,
+    publicOrigin: settings.publicOrigin,
+    paymentEnvironment: settings.paymentEnvironment,
+    stripePublishableKey: settings.stripePublishableKey,
+    googleEnabled: settings.googleEnabled,
+    appleEnabled: settings.appleEnabled,
+    twitterEnabled: settings.twitterEnabled,
+    facebookEnabled: settings.facebookEnabled,
+    openrouterSystemPrompt: settings.openrouterSystemPrompt,
+    turnstileSiteKey: settings.turnstileSiteKey,
+    logoUrlDark: settings.logoUrlDark,
+    logoUrlLight: settings.logoUrlLight,
+    logoWidth: settings.logoWidth,
+    logoHeight: settings.logoHeight,
+    currentFavicon: settings.currentFavicon,
+    lastUpdated: settings.lastUpdated,
+    isFallback: settings.isFallback,
+  };
+}
+
 // Default fallback values
 const DEFAULT_SETTINGS: Omit<CachedSettings, 'lastUpdated'> = {
   siteName: "AI Chat Interface",
@@ -75,12 +133,11 @@ const DEFAULT_SETTINGS: Omit<CachedSettings, 'lastUpdated'> = {
   defaultLanguage: "en",
   defaultTheme: "dark",
   defaultPage: "landing",
+  publicOrigin: "",
   paymentEnvironment: "test",
-  activePaymentProvider: "stripe",
   stripePublishableKey: "",
   stripeSecretKey: "",
   stripeWebhookSecret: "",
-  opayApiKey: "",
   googleEnabled: true,
   googleClientId: "",
   googleClientSecret: "",
@@ -96,7 +153,6 @@ const DEFAULT_SETTINGS: Omit<CachedSettings, 'lastUpdated'> = {
   openrouterApiKey: "",
   openrouterSystemPrompt: "",
   replicateApiKey: "",
-  openaiApiKey: "",
   elevenlabsApiKey: "",
   r2AccountId: "",
   r2AccessKeyId: "",
@@ -243,12 +299,11 @@ class SettingsStore {
         defaultLanguage: generalSettings.default_language || DEFAULT_SETTINGS.defaultLanguage,
         defaultTheme: generalSettings.default_theme || DEFAULT_SETTINGS.defaultTheme,
         defaultPage: generalSettings.default_page || DEFAULT_SETTINGS.defaultPage,
+        publicOrigin: generalSettings.public_origin || DEFAULT_SETTINGS.publicOrigin,
         paymentEnvironment: paymentSettings.environment || DEFAULT_SETTINGS.paymentEnvironment,
-        activePaymentProvider: (paymentSettings.active_payment_provider as 'stripe' | 'opaybd') || DEFAULT_SETTINGS.activePaymentProvider,
         stripePublishableKey: paymentSettings.stripe_publishable_key || DEFAULT_SETTINGS.stripePublishableKey,
         stripeSecretKey: paymentSettings.stripe_secret_key || DEFAULT_SETTINGS.stripeSecretKey,
         stripeWebhookSecret: paymentSettings.stripe_webhook_secret || DEFAULT_SETTINGS.stripeWebhookSecret,
-        opayApiKey: paymentSettings.opay_api_key || DEFAULT_SETTINGS.opayApiKey,
         googleEnabled: oauthSettings.google_enabled !== 'false',
         googleClientId: oauthSettings.google_client_id || DEFAULT_SETTINGS.googleClientId,
         googleClientSecret: oauthSettings.google_client_secret || DEFAULT_SETTINGS.googleClientSecret,
@@ -264,7 +319,6 @@ class SettingsStore {
         openrouterApiKey: aiModelSettings.openrouter_api_key || DEFAULT_SETTINGS.openrouterApiKey,
         openrouterSystemPrompt: aiModelSettings.openrouter_system_prompt || DEFAULT_SETTINGS.openrouterSystemPrompt,
         replicateApiKey: aiModelSettings.replicate_api_key || DEFAULT_SETTINGS.replicateApiKey,
-        openaiApiKey: aiModelSettings.openai_api_key || DEFAULT_SETTINGS.openaiApiKey,
         elevenlabsApiKey: aiModelSettings.elevenlabs_api_key || DEFAULT_SETTINGS.elevenlabsApiKey,
         r2AccountId: cloudStorageSettings.r2_account_id || DEFAULT_SETTINGS.r2AccountId,
         r2AccessKeyId: cloudStorageSettings.r2_access_key_id || DEFAULT_SETTINGS.r2AccessKeyId,
@@ -404,28 +458,9 @@ export async function getPaymentSettings() {
   const settings = await settingsStore.getSettings();
   return {
     paymentEnvironment: settings.paymentEnvironment,
-    activePaymentProvider: settings.activePaymentProvider,
     stripePublishableKey: settings.stripePublishableKey,
     stripeSecretKey: settings.stripeSecretKey,
-    stripeWebhookSecret: settings.stripeWebhookSecret,
-    opayApiKey: settings.opayApiKey
-  };
-}
-
-// Active payment provider convenience function
-export async function getActivePaymentProvider(): Promise<'stripe' | 'opaybd'> {
-  return await settingsStore.getSetting('activePaymentProvider');
-}
-
-// Opaybd settings convenience functions
-export async function getOpayApiKey(): Promise<string> {
-  return await settingsStore.getSetting('opayApiKey');
-}
-
-export async function getOpaySettings() {
-  const settings = await settingsStore.getSettings();
-  return {
-    apiKey: settings.opayApiKey
+    stripeWebhookSecret: settings.stripeWebhookSecret
   };
 }
 
@@ -505,7 +540,6 @@ export async function getAIModelSettings() {
   return {
     openrouterApiKey: settings.openrouterApiKey,
     replicateApiKey: settings.replicateApiKey,
-    openaiApiKey: settings.openaiApiKey,
     elevenlabsApiKey: settings.elevenlabsApiKey
   };
 }
@@ -516,11 +550,6 @@ export async function getOpenRouterApiKey(): Promise<string> {
 
 export async function getReplicateApiKey(): Promise<string> {
   const key = await settingsStore.getSetting('replicateApiKey');
-  return typeof key === 'string' ? key : '';
-}
-
-export async function getOpenAIApiKey(): Promise<string> {
-  const key = await settingsStore.getSetting('openaiApiKey');
   return typeof key === 'string' ? key : '';
 }
 
@@ -613,4 +642,18 @@ export async function getOpenRouterSystemPrompt(): Promise<string> {
 // Default page convenience function
 export async function getDefaultPage(): Promise<string> {
   return await settingsStore.getSetting('defaultPage');
+}
+
+/**
+ * Get public origin URL for the application
+ * Priority: Admin settings -> ORIGIN env var -> localhost fallback
+ */
+export async function getPublicOrigin(): Promise<string> {
+  const settings = await settingsStore.getSettings();
+  if (settings.publicOrigin?.trim()) {
+    return settings.publicOrigin.trim();
+  }
+  // Fallback to env var, then localhost
+  const { env } = await import('$env/dynamic/private');
+  return env.ORIGIN || 'http://localhost:5173';
 }

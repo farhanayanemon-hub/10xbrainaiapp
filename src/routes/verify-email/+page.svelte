@@ -1,10 +1,14 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, getContext } from 'svelte'
   import { goto } from '$app/navigation'
   import type { PageData } from './$types'
   import * as Card from "$lib/components/ui/card/index.js";
+  import type { SettingsState } from "$lib/stores/settings.svelte.js";
 
   let { data }: { data: PageData } = $props()
+
+  // Get settings from context
+  const settingsState = getContext<SettingsState>("settings");
 
   // Redirect to login after successful verification (if not logged in)
   onMount(() => {
@@ -23,7 +27,7 @@
 </script>
 
 <svelte:head>
-  <title>Email Verification - AI Models Platform</title>
+  <title>Email Verification - {settingsState.siteName}</title>
   <meta name="description" content="Verify your email address to complete account setup" />
 </svelte:head>
 
@@ -107,7 +111,7 @@
     <!-- Footer -->
     <div class="mt-8 text-center">
       <p class="text-sm text-muted-foreground">
-        © 2025 AI Models Platform. All rights reserved.
+        © {new Date().getFullYear()} {settingsState.siteName}. All rights reserved.
       </p>
     </div>
   </div>

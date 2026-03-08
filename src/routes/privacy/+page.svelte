@@ -1,14 +1,19 @@
 <script lang="ts">
+  import { getContext } from "svelte";
   import Button from "$lib/components/ui/button/button.svelte";
   import { goto } from "$app/navigation";
   import { ArrowLeftIcon } from "$lib/icons/index.js";
+  import type { SettingsState } from "$lib/stores/settings.svelte.js";
+
+  // Get settings from context
+  const settingsState = getContext<SettingsState>("settings");
 </script>
 
 <svelte:head>
-  <title>Privacy Policy - AI Models Platform</title>
+  <title>Privacy Policy - {settingsState.siteName}</title>
   <meta
     name="description"
-    content="Privacy Policy for AI Models Platform. Learn how we collect, use, and protect your personal information."
+    content="Privacy Policy for {settingsState.siteName}. Learn how we collect, use, and protect your personal information."
   />
 </svelte:head>
 
@@ -26,7 +31,7 @@
     <section class="mb-8">
       <h2 class="text-2xl font-semibold mb-4">1. Introduction</h2>
       <p class="mb-4">
-        AI Models Platform ("we," "our," or "us") is committed to protecting
+        {settingsState.siteName} ("we," "our," or "us") is committed to protecting
         your privacy. This Privacy Policy explains how we collect, use,
         disclose, and safeguard your information when you use our AI-powered
         services.
@@ -62,7 +67,7 @@
       </h2>
       <p class="mb-4">We use your information to:</p>
       <ul>
-        <li>Provide and maintain the AI Models Platform service</li>
+        <li>Provide and maintain the {settingsState.siteName} service</li>
         <li>Process your transactions and manage subscriptions</li>
         <li>Improve our AI models and service quality</li>
         <li>Communicate with you about service updates and support</li>

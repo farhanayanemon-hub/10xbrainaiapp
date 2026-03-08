@@ -1,12 +1,13 @@
-import type { CachedSettings } from '$lib/server/settings-store';
+import type { PublicSettings } from '$lib/server/settings-store';
 
 /**
- * Client-side settings store that provides reactive access to site settings
+ * Client-side settings store that provides reactive access to site settings.
+ * Uses PublicSettings (not CachedSettings) to ensure server secrets are never available on the client.
  */
 export class SettingsState {
-  private _settings = $state<CachedSettings | null>(null);
+  private _settings = $state<PublicSettings | null>(null);
 
-  constructor(initialSettings?: CachedSettings) {
+  constructor(initialSettings?: PublicSettings) {
     if (initialSettings) {
       this._settings = initialSettings;
     }
@@ -15,24 +16,24 @@ export class SettingsState {
   /**
    * Get the current settings
    */
-  get settings(): CachedSettings | null {
+  get settings(): PublicSettings | null {
     return this._settings;
   }
 
   /**
    * Update the settings (typically from server-side data)
    */
-  setSettings(newSettings: CachedSettings) {
+  setSettings(newSettings: PublicSettings) {
     this._settings = newSettings;
   }
 
   /**
    * Get a specific setting value with fallback
    */
-  getSetting<K extends keyof Omit<CachedSettings, 'lastUpdated'>>(
+  getSetting<K extends keyof Omit<PublicSettings, 'lastUpdated'>>(
     key: K,
-    fallback: CachedSettings[K]
-  ): CachedSettings[K] {
+    fallback: PublicSettings[K]
+  ): PublicSettings[K] {
     return this._settings?.[key] ?? fallback;
   }
 
@@ -50,8 +51,6 @@ export class SettingsState {
   get siteDescription(): string {
     return this._settings?.siteDescription ?? "A unified web application for interacting with 65+ AI models from 9 different providers through a single, intuitive interface.";
   }
-
-
 
   get logoUrlDark(): string {
     return this._settings?.logoUrlDark ?? "/branding/logos/default-dark-logo.png";
@@ -74,7 +73,7 @@ export class SettingsState {
   }
 
   /**
-   * Convenient getters for payment settings
+   * Convenient getters for payment settings (public keys only)
    */
   get paymentEnvironment(): string {
     return this._settings?.paymentEnvironment ?? "test";
@@ -82,13 +81,5 @@ export class SettingsState {
 
   get stripePublishableKey(): string {
     return this._settings?.stripePublishableKey ?? "";
-  }
-
-  get stripeSecretKey(): string {
-    return this._settings?.stripeSecretKey ?? "";
-  }
-
-  get stripeWebhookSecret(): string {
-    return this._settings?.stripeWebhookSecret ?? "";
   }
 }

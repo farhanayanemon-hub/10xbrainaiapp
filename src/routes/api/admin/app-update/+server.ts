@@ -17,6 +17,8 @@ const PROTECTED_PATHS = [
         'node_modules',
         'uploads',
         'drizzle.config.ts',
+        'vite.config.ts',
+        'svelte.config.js',
         'opaybd-backup',
         'opaybd-backup.tar.gz',
         '.git',

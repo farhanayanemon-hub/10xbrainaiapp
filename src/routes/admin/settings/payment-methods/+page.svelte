@@ -20,9 +20,7 @@
   let isSubmitting = $state(false);
   let showSecretKey = $state(false);
   let showWebhookSecret = $state(false);
-  let showOpayApiKey = $state(false);
-  let showStripeInstructions = $state(false);
-  let showOpayInstructions = $state(false);
+  let showInstructions = $state(false);
   let copiedWebhookUrl = $state(false);
 
   // Environment options
@@ -31,37 +29,12 @@
     { value: "live", label: "Live Mode" },
   ];
 
-  // Payment provider options
-  const providerOptions = [
-    {
-      value: "stripe",
-      label: "Stripe",
-      description: "Credit cards, Apple Pay, Google Pay, and more",
-    },
-    {
-      value: "opaybd",
-      label: "Opaybd",
-      description: "bKash, Nagad, Rocket, and local payment methods",
-    },
-  ];
+  // Reactive form values - initialize from server-loaded settings
+  let selectedEnvironment = $state(data?.settings?.environment || "test");
+  let stripePublishableKey = $state(data?.settings?.stripePublishableKey || "");
+  let stripeSecretKey = $state(data?.settings?.stripeSecretKey || "");
+  let stripeWebhookSecret = $state(data?.settings?.stripeWebhookSecret || "");
 
-  // Reactive form values - initialize with current settings or form data
-  let activeProvider = $state(
-    form?.activeProvider || data?.settings?.activeProvider || "stripe"
-  );
-  let selectedEnvironment = $state(
-    form?.environment || data?.settings?.environment || "test"
-  );
-  let stripePublishableKey = $state(
-    form?.stripePublishableKey || data?.settings?.stripePublishableKey || ""
-  );
-  let stripeSecretKey = $state(
-    form?.stripeSecretKey || data?.settings?.stripeSecretKey || ""
-  );
-  let stripeWebhookSecret = $state(
-    form?.stripeWebhookSecret || data?.settings?.stripeWebhookSecret || ""
-  );
-  let opayApiKey = $state(form?.opayApiKey || data?.settings?.opayApiKey || "");
   const environmentLabel = $derived(
     environmentOptions.find((env) => env.value === selectedEnvironment)
       ?.label ?? "Test Mode"
@@ -71,12 +44,10 @@
   $effect(() => {
     // Update reactive state when data changes (e.g., on page refresh or form reset)
     if (data?.settings && !form) {
-      activeProvider = data.settings.activeProvider || "stripe";
       selectedEnvironment = data.settings.environment || "test";
       stripePublishableKey = data.settings.stripePublishableKey || "";
       stripeSecretKey = data.settings.stripeSecretKey || "";
       stripeWebhookSecret = data.settings.stripeWebhookSecret || "";
-      opayApiKey = data.settings.opayApiKey || "";
     }
   });
 
@@ -93,25 +64,12 @@
     );
   }
 
-  // Function to check if Opaybd is configured
-  function isOpayConfigured() {
-    return !!data?.settings?.opayApiKey;
-  }
-
   // Get webhook URL for current domain
   function getWebhookUrl() {
     if (typeof window !== "undefined") {
       return `${window.location.origin}/api/stripe/webhook`;
     }
     return "https://yourdomain.com/api/stripe/webhook";
-  }
-
-  // Get Opaybd callback URL for current domain
-  function getOpayCallbackUrl() {
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}/api/opaybd/callback`;
-    }
-    return "https://yourdomain.com/api/opaybd/callback";
   }
 
   // Copy webhook URL to clipboard
@@ -166,9 +124,342 @@
       Payment Methods
     </h1>
     <p class="text-muted-foreground">
-      Configure payment providers for subscription processing.
+      Configure Stripe integration and payment processing settings.
     </p>
   </div>
+
+  <!-- Setup Instructions Card -->
+  <Card.Root
+    class="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30"
+  >
+    <Card.Header>
+      <div class="flex items-center justify-between">
+        <div>
+          <Card.Title class="flex items-center gap-2">
+            <svg
+              class="w-5 h-5 text-blue-600 dark:text-blue-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            Setup Instructions
+          </Card.Title>
+          <Card.Description>
+            Step-by-step guide to configure Stripe integration
+          </Card.Description>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onclick={() => (showInstructions = !showInstructions)}
+        >
+          {showInstructions ? "Hide" : "Show"} Instructions
+          <svg
+            class="w-4 h-4 ml-1 transition-transform"
+            class:rotate-180={showInstructions}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            ></path>
+          </svg>
+        </Button>
+      </div>
+    </Card.Header>
+
+    {#if showInstructions}
+      <Card.Content class="space-y-6">
+        <!-- Section 1: Getting API Keys -->
+        <div class="space-y-4">
+          <h3 class="font-semibold text-base flex items-center gap-2">
+            <span
+              class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-sm"
+              >1</span
+            >
+            Getting Your Stripe API Keys
+          </h3>
+          <div class="pl-8 space-y-3 text-sm">
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >1</span
+              >
+              <p>
+                Log in to your <a
+                  href="https://dashboard.stripe.com"
+                  target="_blank"
+                  rel="noopener"
+                  class="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+                >
+                  Stripe Dashboard
+                  <svg
+                    class="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    ></path>
+                  </svg>
+                </a>
+              </p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >2</span
+              >
+              <p>
+                Navigate to <strong>Developers</strong> →
+                <strong>API keys</strong> in the left sidebar
+              </p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >3</span
+              >
+              <div class="flex-1">
+                <p class="mb-2">Copy your keys based on your environment:</p>
+                <div
+                  class="bg-white dark:bg-gray-900 border dark:border-gray-700 rounded-md p-3 space-y-2"
+                >
+                  <div>
+                    <p
+                      class="font-medium text-xs text-gray-600 dark:text-gray-400 mb-1"
+                    >
+                      Test Mode (Development):
+                    </p>
+                    <ul
+                      class="list-disc list-inside text-xs text-gray-700 dark:text-gray-300 space-y-1 ml-2"
+                    >
+                      <li>
+                        <strong>Publishable key:</strong> Starts with
+                        <code
+                          class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                          >pk_test_</code
+                        >
+                      </li>
+                      <li>
+                        <strong>Secret key:</strong> Starts with
+                        <code
+                          class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                          >sk_test_</code
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                  <div class="pt-2 border-t dark:border-gray-700">
+                    <p
+                      class="font-medium text-xs text-gray-600 dark:text-gray-400 mb-1"
+                    >
+                      Live Mode (Production):
+                    </p>
+                    <ul
+                      class="list-disc list-inside text-xs text-gray-700 dark:text-gray-300 space-y-1 ml-2"
+                    >
+                      <li>
+                        <strong>Publishable key:</strong> Starts with
+                        <code
+                          class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                          >pk_live_</code
+                        >
+                      </li>
+                      <li>
+                        <strong>Secret key:</strong> Starts with
+                        <code
+                          class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                          >sk_live_</code
+                        >
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Setting Up Webhook -->
+        <div class="space-y-4 pt-4 border-t">
+          <h3 class="font-semibold text-base flex items-center gap-2">
+            <span
+              class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-sm"
+              >2</span
+            >
+            Setting Up Webhook Secret
+          </h3>
+          <div class="pl-8 space-y-3 text-sm">
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >1</span
+              >
+              <p>
+                In the Stripe Dashboard, go to <strong>Developers</strong> →
+                <strong>Webhooks</strong>
+              </p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >2</span
+              >
+              <p>
+                Click <strong>"Add endpoint"</strong> or
+                <strong>"+ Add an endpoint"</strong>
+              </p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >3</span
+              >
+              <div class="flex-1">
+                <p class="mb-2">Enter your webhook endpoint URL:</p>
+                <div class="flex items-center gap-2">
+                  <code
+                    class="flex-1 bg-gray-900 dark:bg-gray-800 text-gray-100 dark:text-gray-200 px-3 py-2 rounded font-mono text-xs overflow-x-auto"
+                  >
+                    {getWebhookUrl()}
+                  </code>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onclick={copyWebhookUrl}
+                    class="flex-shrink-0"
+                  >
+                    {#if copiedWebhookUrl}
+                      <CheckCircleIcon class="w-4 h-4 text-green-600" />
+                    {:else}
+                      <svg
+                        class="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        ></path>
+                      </svg>
+                    {/if}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >4</span
+              >
+              <div class="flex-1">
+                <p class="mb-2">
+                  Select events to listen to. <strong>Required events:</strong>
+                </p>
+                <div
+                  class="bg-white dark:bg-gray-900 border dark:border-gray-700 rounded-md p-3"
+                >
+                  <ul
+                    class="list-disc list-inside text-xs text-gray-700 dark:text-gray-300 space-y-1"
+                  >
+                    <li>
+                      <code
+                        class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                        >checkout.session.completed</code
+                      >
+                    </li>
+                    <li>
+                      <code
+                        class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                        >customer.subscription.created</code
+                      >
+                    </li>
+                    <li>
+                      <code
+                        class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                        >customer.subscription.updated</code
+                      >
+                    </li>
+                    <li>
+                      <code
+                        class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                        >customer.subscription.deleted</code
+                      >
+                    </li>
+                    <li>
+                      <code
+                        class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                        >invoice.payment_succeeded</code
+                      >
+                    </li>
+                    <li>
+                      <code
+                        class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                        >invoice.payment_failed</code
+                      >
+                    </li>
+                  </ul>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    <em
+                      >Tip: You can also select "Send all events" for
+                      comprehensive tracking</em
+                    >
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >5</span
+              >
+              <p>Click <strong>"Add endpoint"</strong> to save</p>
+            </div>
+            <div class="flex items-start gap-2">
+              <span
+                class="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium mt-0.5"
+                >6</span
+              >
+              <div class="flex-1">
+                <p>
+                  After creation, click on the webhook endpoint to view details,
+                  then click <strong>"Reveal"</strong> next to
+                  <strong>"Signing secret"</strong>
+                </p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  The signing secret starts with <code
+                    class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded"
+                    >whsec_</code
+                  >
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card.Content>
+    {/if}
+  </Card.Root>
 
   <!-- Form -->
   <form
@@ -201,187 +492,17 @@
       </div>
     {/if}
 
-    <!-- Payment Provider Selection Card -->
-    <Card.Root class="border-2 border-primary/20">
+    <!-- Stripe Configuration -->
+    <Card.Root>
       <Card.Header>
         <Card.Title class="flex items-center gap-2">
-          <svg
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-            ></path>
-          </svg>
-          Active Payment Provider
+          <CreditCardIcon class="w-5 h-5" />
+          Stripe Configuration
         </Card.Title>
-        <Card.Description>
-          Select which payment provider will be used for processing
-          subscriptions
-        </Card.Description>
+        <Card.Description
+          >Configure your Stripe API keys for payment processing</Card.Description
+        >
       </Card.Header>
-      <Card.Content>
-        <input type="hidden" name="activeProvider" value={activeProvider} />
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {#each providerOptions as option}
-            <button
-              type="button"
-              onclick={() => {
-                if (!data.isDemoMode) activeProvider = option.value;
-              }}
-              class="relative flex text-left rounded-lg border p-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary {activeProvider ===
-              option.value
-                ? 'border-primary bg-primary/5'
-                : 'border-muted'} {data.isDemoMode
-                ? 'opacity-60 cursor-not-allowed'
-                : 'cursor-pointer hover:border-primary/50'}"
-              disabled={data.isDemoMode}
-            >
-              <div class="flex w-full items-center">
-                <div class="flex items-center">
-                  <div class="text-sm">
-                    <p
-                      class="font-medium {activeProvider === option.value
-                        ? 'text-primary'
-                        : ''}"
-                    >
-                      {option.label}
-                    </p>
-                    <p class="text-muted-foreground text-xs">
-                      {option.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              {#if activeProvider === option.value}
-                <CheckCircleIcon
-                  class="absolute bottom-2 right-2 h-5 w-5 text-primary"
-                />
-              {/if}
-              {#if option.value === "stripe" && isStripeConfigured()}
-                <span
-                  class="absolute top-2 right-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full"
-                  >Configured</span
-                >
-              {:else if option.value === "opaybd" && isOpayConfigured()}
-                <span
-                  class="absolute top-2 right-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full"
-                  >Configured</span
-                >
-              {/if}
-            </button>
-          {/each}
-        </div>
-        {#if activeProvider === "opaybd" && !isOpayConfigured()}
-          <p class="mt-3 text-sm text-amber-600 flex items-center gap-1">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fill-rule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              ></path>
-            </svg>
-            Please configure Opaybd credentials below before saving
-          </p>
-        {/if}
-      </Card.Content>
-    </Card.Root>
-
-    <!-- Stripe Configuration -->
-    <Card.Root class={activeProvider === "stripe" ? "border-primary/30" : ""}>
-      <Card.Header>
-        <div class="flex items-center justify-between">
-          <div>
-            <Card.Title class="flex items-center gap-2">
-              <CreditCardIcon class="w-5 h-5" />
-              Stripe Configuration
-              {#if activeProvider === "stripe"}
-                <span
-                  class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full"
-                  >Active</span
-                >
-              {/if}
-            </Card.Title>
-            <Card.Description
-              >Configure your Stripe API keys for payment processing</Card.Description
-            >
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onclick={() => (showStripeInstructions = !showStripeInstructions)}
-          >
-            {showStripeInstructions ? "Hide" : "Show"} Setup Guide
-            <svg
-              class="w-4 h-4 ml-1 transition-transform"
-              class:rotate-180={showStripeInstructions}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </Button>
-        </div>
-      </Card.Header>
-
-      {#if showStripeInstructions}
-        <Card.Content class="border-t bg-muted/30 space-y-4 py-2">
-          <div class="text-sm space-y-3">
-            <p class="font-medium">Quick Setup:</p>
-            <ol
-              class="list-decimal list-inside space-y-2 text-muted-foreground"
-            >
-              <li>
-                Log in to your <a
-                  href="https://dashboard.stripe.com"
-                  target="_blank"
-                  rel="noopener"
-                  class="text-blue-600 hover:underline">Stripe Dashboard</a
-                >
-              </li>
-              <li>
-                Navigate to <strong>Developers</strong> →
-                <strong>API keys</strong>
-              </li>
-              <li>
-                Copy your Publishable key (<code class="bg-muted px-1 rounded"
-                  >pk_test_</code
-                >
-                or <code class="bg-muted px-1 rounded">pk_live_</code>)
-              </li>
-              <li>
-                Copy your Secret key (<code class="bg-muted px-1 rounded"
-                  >sk_test_</code
-                >
-                or <code class="bg-muted px-1 rounded">sk_live_</code>)
-              </li>
-              <li>
-                Set up a webhook endpoint at: <code
-                  class="bg-muted px-1 rounded text-xs">{getWebhookUrl()}</code
-                >
-              </li>
-              <li>
-                Copy the webhook signing secret (<code
-                  class="bg-muted px-1 rounded">whsec_</code
-                >)
-              </li>
-            </ol>
-          </div>
-        </Card.Content>
-      {/if}
-
       <Card.Content class="space-y-4">
         <!-- Environment Selection -->
         <div class="space-y-2">
@@ -426,7 +547,8 @@
               disabled={data.isDemoMode}
             />
             <p class="text-xs text-muted-foreground">
-              Used in the frontend for creating payment elements
+              Used in the frontend for creating payment elements (safe to expose
+              publicly)
             </p>
           </div>
 
@@ -460,7 +582,7 @@
               disabled={data.isDemoMode}
             />
             <p class="text-xs text-muted-foreground">
-              Used on the server for API calls (encrypted)
+              Used on the server for API calls
             </p>
           </div>
 
@@ -492,127 +614,7 @@
               disabled={data.isDemoMode}
             />
             <p class="text-xs text-muted-foreground">
-              Used to verify webhook events from Stripe (encrypted)
-            </p>
-          </div>
-        </div>
-      </Card.Content>
-    </Card.Root>
-
-    <!-- Opaybd Configuration -->
-    <Card.Root class={activeProvider === "opaybd" ? "border-primary/30" : ""}>
-      <Card.Header>
-        <div class="flex items-center justify-between">
-          <div>
-            <Card.Title class="flex items-center gap-2">
-              <svg
-                class="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                ></path>
-              </svg>
-              Opaybd Configuration
-              {#if activeProvider === "opaybd"}
-                <span
-                  class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full"
-                  >Active</span
-                >
-              {/if}
-            </Card.Title>
-            <Card.Description
-              >Configure Opaybd for local Bangladesh payment methods</Card.Description
-            >
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onclick={() => (showOpayInstructions = !showOpayInstructions)}
-          >
-            {showOpayInstructions ? "Hide" : "Show"} Setup Guide
-            <svg
-              class="w-4 h-4 ml-1 transition-transform"
-              class:rotate-180={showOpayInstructions}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              ></path>
-            </svg>
-          </Button>
-        </div>
-      </Card.Header>
-
-      {#if showOpayInstructions}
-        <Card.Content class="border-t bg-muted/30 space-y-4 py-2">
-          <div class="text-sm space-y-3">
-            <p class="font-medium">Quick Setup:</p>
-            <ol
-              class="list-decimal list-inside space-y-2 text-muted-foreground"
-            >
-              <li>
-                Set up your callback URL: <code
-                  class="bg-muted px-1 rounded text-xs"
-                  >{getOpayCallbackUrl()}</code
-                >
-              </li>
-            </ol>
-            <div
-              class="mt-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md"
-            >
-              <p class="text-amber-700 dark:text-amber-400 text-xs">
-                <strong>Note:</strong> Opaybd uses one-time payments. Subscriptions
-                are managed by tracking expiry dates and prompting users to renew.
-              </p>
-            </div>
-          </div>
-        </Card.Content>
-      {/if}
-
-      <Card.Content class="space-y-4">
-        <!-- Opaybd API Keys -->
-        <div class="grid grid-cols-1 gap-4">
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <Label for="opayApiKey">Opaybd API Key</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onclick={() => (showOpayApiKey = !showOpayApiKey)}
-                class="h-auto p-1"
-                disabled={data.isDemoMode}
-              >
-                {#if showOpayApiKey}
-                  <EyeOffIcon class="w-4 h-4" />
-                {:else}
-                  <EyeIcon class="w-4 h-4" />
-                {/if}
-              </Button>
-            </div>
-            <Input
-              id="opayApiKey"
-              name="opayApiKey"
-              type={showOpayApiKey ? "text" : "password"}
-              placeholder="Your API key..."
-              bind:value={opayApiKey}
-              class="font-mono"
-              disabled={data.isDemoMode}
-            />
-            <p class="text-xs text-muted-foreground">
-              Your Opaybd API key (encrypted)
+              Used to verify webhook events from Stripe
             </p>
           </div>
         </div>

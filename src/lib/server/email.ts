@@ -3,6 +3,7 @@ import { env } from '$env/dynamic/private'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { getMailingSettings } from './admin-settings'
+import { getPublicOrigin, getLogoUrlLight, getLogoWidth, getLogoHeight, getSiteName } from './settings-store'
 
 // Email configuration types
 /**
@@ -261,7 +262,7 @@ class EmailService {
       // Get current SMTP configuration for "from" fields
       const smtpConfig = await this.getSmtpConfig()
       const fromEmail = smtpConfig.fromEmail || smtpConfig.user
-      const fromName = smtpConfig.fromName || 'AI Models Platform'
+      const fromName = smtpConfig.fromName || await getSiteName()
 
       const mailOptions = {
         from: `${fromName} <${fromEmail}>`,
@@ -288,9 +289,20 @@ class EmailService {
   async generateWelcomeEmail(data: WelcomeEmailData): Promise<{ html: string; text: string }> {
     const { name, email, verificationUrl } = data
     const smtpConfig = await this.getSmtpConfig()
-    const platformName = smtpConfig.fromName || 'AI Models Platform'
+    const platformName = smtpConfig.fromName || await getSiteName()
     const displayName = name || email.split('@')[0]
     const isVerificationRequired = !!verificationUrl
+    const publicOrigin = await getPublicOrigin()
+
+    // Get logo settings for email header
+    const logoUrlLight = await getLogoUrlLight()
+    const logoWidth = await getLogoWidth()
+    const logoHeight = await getLogoHeight()
+
+    // Build absolute URL for email clients (they don't resolve relative URLs)
+    const logoUrl = logoUrlLight.startsWith('http')
+      ? logoUrlLight
+      : `${publicOrigin}${logoUrlLight}`
 
     let html: string
 
@@ -303,7 +315,10 @@ class EmailService {
         displayName,
         verificationUrl: verificationUrl || '',
         isVerificationRequired,
-        publicOrigin: env.PUBLIC_ORIGIN || 'http://localhost:5173'
+        publicOrigin,
+        logoUrl,
+        logoWidth,
+        logoHeight
       })
       console.log('[Email Service] Successfully processed welcome email template')
     } catch (error) {
@@ -336,7 +351,7 @@ class EmailService {
     </div>
     <a href="${verificationUrl}" class="button verify-button">✉️ Verify Email Address</a><br>
     ` : ''}
-    <a href="${env.PUBLIC_ORIGIN || 'http://localhost:5173'}" class="button">Start Creating</a>
+    <a href="${publicOrigin}" class="button">Start Creating</a>
     <p><small>Welcome to the future of AI interaction!</small></p>
   </div>
 </body>
@@ -361,7 +376,7 @@ ${verificationUrl}
 • Seamless conversation history across all models
 • Multimodal chat with image and text support
 
-${isVerificationRequired ? 'After verifying your email, start creating at:' : 'Ready to start creating? Visit:'} ${env.PUBLIC_ORIGIN || 'http://localhost:5173'}
+${isVerificationRequired ? 'After verifying your email, start creating at:' : 'Ready to start creating? Visit:'} ${publicOrigin}
 
 Welcome to the future of AI interaction!
 
@@ -378,8 +393,19 @@ ${platformName}
   async generatePasswordResetEmail(data: PasswordResetEmailData): Promise<{ html: string; text: string }> {
     const { name, email, resetUrl } = data
     const smtpConfig = await this.getSmtpConfig()
-    const platformName = smtpConfig.fromName || 'AI Models Platform'
+    const platformName = smtpConfig.fromName || await getSiteName()
     const displayName = name || email.split('@')[0]
+    const publicOrigin = await getPublicOrigin()
+
+    // Get logo settings for email header
+    const logoUrlLight = await getLogoUrlLight()
+    const logoWidth = await getLogoWidth()
+    const logoHeight = await getLogoHeight()
+
+    // Build absolute URL for email clients (they don't resolve relative URLs)
+    const logoUrl = logoUrlLight.startsWith('http')
+      ? logoUrlLight
+      : `${publicOrigin}${logoUrlLight}`
 
     let html: string
 
@@ -391,7 +417,10 @@ ${platformName}
         platformName,
         displayName,
         resetUrl,
-        publicOrigin: env.PUBLIC_ORIGIN || 'http://localhost:5173'
+        publicOrigin,
+        logoUrl,
+        logoWidth,
+        logoHeight
       })
       console.log('[Email Service] Successfully processed password reset email template')
     } catch (error) {
@@ -454,7 +483,7 @@ If you continue to receive these emails or have concerns about your account secu
 
 ---
 ${platformName}
-${env.PUBLIC_ORIGIN || 'http://localhost:5173'}
+${publicOrigin}
 `
 
     return { html, text }
@@ -468,11 +497,11 @@ ${env.PUBLIC_ORIGIN || 'http://localhost:5173'}
   async sendWelcomeEmail(userData: WelcomeEmailData): Promise<boolean> {
     const { html, text } = await this.generateWelcomeEmail(userData)
     const smtpConfig = await this.getSmtpConfig()
-    const platformName = smtpConfig.fromName || 'AI Models Platform'
+    const platformName = smtpConfig.fromName || await getSiteName()
 
     return await this.sendEmail({
       to: userData.email,
-      subject: `Welcome to ${platformName}! 🚀`,
+      subject: `Welcome to ${platformName}`,
       html,
       text
     })
@@ -486,7 +515,7 @@ ${env.PUBLIC_ORIGIN || 'http://localhost:5173'}
   async sendPasswordResetEmail(userData: PasswordResetEmailData): Promise<boolean> {
     const { html, text } = await this.generatePasswordResetEmail(userData)
     const smtpConfig = await this.getSmtpConfig()
-    const platformName = smtpConfig.fromName || 'AI Models Platform'
+    const platformName = smtpConfig.fromName || await getSiteName()
 
     return await this.sendEmail({
       to: userData.email,

@@ -51,6 +51,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 		// Validate voice settings if provided
 		if (voiceSettings) {
+			// Limit voice settings JSON size to prevent DoS attacks
+			// Max 1KB should be more than enough for valid voice settings
+			const settingsSize = JSON.stringify(voiceSettings).length;
+			if (settingsSize > 1024) {
+				return json({ error: 'Voice settings too large (max 1KB)' }, { status: 400 });
+			}
+
 			if (voiceSettings.stability !== undefined && (voiceSettings.stability < 0 || voiceSettings.stability > 1)) {
 				return json({ error: 'Stability must be between 0 and 1' }, { status: 400 });
 			}

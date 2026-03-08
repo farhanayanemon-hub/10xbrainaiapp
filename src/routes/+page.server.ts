@@ -1,19 +1,15 @@
 import type { PageServerLoad } from './$types'
 import { redirect } from '@sveltejs/kit'
-import { getLandingSettings } from '$lib/server/admin-settings.js'
-import { getPricingPlans } from '$lib/server/pricing-plans-seeder.js'
 
 export const load: PageServerLoad = async ({ locals }) => {
+  // Get the default page setting from cached settings (loaded by settingsHandle in hooks)
   const defaultPage = locals.settings?.defaultPage || 'landing'
 
+  // If admin has configured the default page to be the app, redirect to /newchat
   if (defaultPage === 'app') {
     throw redirect(302, '/newchat')
   }
 
-  const [landing, plans] = await Promise.all([
-    getLandingSettings(),
-    getPricingPlans('month')
-  ])
-
-  return { landing, plans }
+  // Otherwise, let the landing page render normally
+  return {}
 }

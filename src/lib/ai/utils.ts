@@ -3,14 +3,48 @@ import { images, videos, audio, transcriptions, voiceChanges, music, soundEffect
 import { storageService } from '$lib/server/storage.js';
 
 /**
+ * Helper function to clean up orphaned files when database operations fail.
+ * This prevents files from accumulating in storage without database records.
+ */
+async function cleanupOrphanedFile(storagePath: string, context: string): Promise<void> {
+	try {
+		console.error(`Cleaning up orphaned file after DB failure (${context}): ${storagePath}`);
+		await storageService.delete(storagePath);
+		console.log(`Successfully cleaned up orphaned file: ${storagePath}`);
+	} catch (cleanupError) {
+		// Log but don't throw - the original error is more important
+		console.error(`Failed to cleanup orphaned file ${storagePath}:`, cleanupError);
+		// Consider implementing a dead-letter queue or scheduled cleanup job
+		// to handle files that couldn't be deleted
+	}
+}
+
+/**
+ * Image generation metadata for storing alongside the image
+ */
+export interface ImageMetadata {
+	prompt?: string;
+	model?: string;
+	aspectRatio?: string;
+	seed?: number;
+	quality?: string;
+	style?: string;
+	numberOfImages?: number;
+	referenceImageUrl?: string;
+	upscaleFactor?: string;
+	compressionQuality?: number;
+}
+
+/**
  * Shared utility function to save image data to storage and create database record
  * Used across multiple AI providers to maintain consistency
  */
 export async function saveImageAndGetId(
-	imageData: string, 
-	mimeType: string, 
-	userId: string, 
-	chatId?: string
+	imageData: string,
+	mimeType: string,
+	userId: string,
+	chatId?: string,
+	metadata?: ImageMetadata
 ): Promise<string> {
 	// Generate unique filename
 	const extension = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1] || 'png';
@@ -31,22 +65,54 @@ export async function saveImageAndGetId(
 		'generated'
 	);
 
-	// Create database record with user association
-	const [imageRecord] = await db
-		.insert(images)
-		.values({
-			filename,
-			userId,
-			chatId: chatId || null,
-			mimeType,
-			fileSize: imageBuffer.length,
-			storageLocation: storageResult.storageLocation,
-			cloudPath: storageResult.path
-		})
-		.returning();
+	// Create database record with user association and metadata
+	// Wrap in try-catch to cleanup orphaned files on DB failure
+	try {
+		const [imageRecord] = await db
+			.insert(images)
+			.values({
+				filename,
+				userId,
+				chatId: chatId || null,
+				mimeType,
+				fileSize: imageBuffer.length,
+				storageLocation: storageResult.storageLocation,
+				cloudPath: storageResult.path,
+				// Generation metadata
+				prompt: metadata?.prompt || null,
+				model: metadata?.model || null,
+				aspectRatio: metadata?.aspectRatio || null,
+				seed: metadata?.seed || null,
+				quality: metadata?.quality || null,
+				style: metadata?.style || null,
+				numberOfImages: metadata?.numberOfImages || null,
+				referenceImageUrl: metadata?.referenceImageUrl || null,
+				upscaleFactor: metadata?.upscaleFactor || null,
+				compressionQuality: metadata?.compressionQuality || null
+			})
+			.returning();
 
-	// Return database ID
-	return imageRecord.id;
+		// Return database ID
+		return imageRecord.id;
+	} catch (dbError) {
+		// Clean up the orphaned file from storage
+		await cleanupOrphanedFile(storageResult.path, 'saveImageAndGetId');
+		throw dbError;
+	}
+}
+
+/**
+ * Video generation metadata for storing alongside the video
+ */
+export interface VideoMetadata {
+	prompt?: string;
+	model?: string;
+	aspectRatio?: string;
+	seed?: number;
+	quality?: string;
+	style?: string;
+	imageStartUrl?: string;
+	imageEndUrl?: string;
 }
 
 /**
@@ -61,7 +127,8 @@ export async function saveVideoAndGetId(
 	duration = 8,
 	resolution = '720p',
 	fps = 24,
-	hasAudio = false
+	hasAudio = false,
+	metadata?: VideoMetadata
 ): Promise<string> {
 	// Generate unique filename
 	const extension = mimeType.split('/')[1] || 'mp4';
@@ -82,26 +149,42 @@ export async function saveVideoAndGetId(
 		'generated'
 	);
 
-	// Create database record with user association
-	const [videoRecord] = await db
-		.insert(videos)
-		.values({
-			filename,
-			userId,
-			chatId: chatId || null,
-			mimeType,
-			fileSize: videoBuffer.length,
-			duration,
-			resolution,
-			fps,
-			hasAudio,
-			storageLocation: storageResult.storageLocation,
-			cloudPath: storageResult.path
-		})
-		.returning();
+	// Create database record with user association and metadata
+	// Wrap in try-catch to cleanup orphaned files on DB failure
+	try {
+		const [videoRecord] = await db
+			.insert(videos)
+			.values({
+				filename,
+				userId,
+				chatId: chatId || null,
+				mimeType,
+				fileSize: videoBuffer.length,
+				duration,
+				resolution,
+				fps,
+				hasAudio,
+				storageLocation: storageResult.storageLocation,
+				cloudPath: storageResult.path,
+				// Generation metadata
+				prompt: metadata?.prompt || null,
+				model: metadata?.model || null,
+				aspectRatio: metadata?.aspectRatio || null,
+				seed: metadata?.seed || null,
+				quality: metadata?.quality || null,
+				style: metadata?.style || null,
+				imageStartUrl: metadata?.imageStartUrl || null,
+				imageEndUrl: metadata?.imageEndUrl || null
+			})
+			.returning();
 
-	// Return database ID
-	return videoRecord.id;
+		// Return database ID
+		return videoRecord.id;
+	} catch (dbError) {
+		// Clean up the orphaned file from storage
+		await cleanupOrphanedFile(storageResult.path, 'saveVideoAndGetId');
+		throw dbError;
+	}
 }
 
 /**
@@ -116,7 +199,8 @@ export async function saveAudioAndGetId(
 	model: string,
 	voiceId: string,
 	chatId?: string,
-	duration?: number
+	duration?: number,
+	messageIndex?: number
 ): Promise<string> {
 	// Generate unique filename
 	const extension = mimeType.split('/')[1] || 'mp3';
@@ -138,25 +222,33 @@ export async function saveAudioAndGetId(
 	);
 
 	// Create database record with user association
-	const [audioRecord] = await db
-		.insert(audio)
-		.values({
-			filename,
-			userId,
-			chatId: chatId || null,
-			mimeType,
-			fileSize: audioBuffer.length,
-			duration: duration || null,
-			text,
-			model,
-			voiceId,
-			storageLocation: storageResult.storageLocation,
-			cloudPath: storageResult.path
-		})
-		.returning();
+	// Wrap in try-catch to cleanup orphaned files on DB failure
+	try {
+		const [audioRecord] = await db
+			.insert(audio)
+			.values({
+				filename,
+				userId,
+				chatId: chatId || null,
+				messageIndex: messageIndex ?? null,
+				mimeType,
+				fileSize: audioBuffer.length,
+				duration: duration || null,
+				text,
+				model,
+				voiceId,
+				storageLocation: storageResult.storageLocation,
+				cloudPath: storageResult.path
+			})
+			.returning();
 
-	// Return database ID
-	return audioRecord.id;
+		// Return database ID
+		return audioRecord.id;
+	} catch (dbError) {
+		// Clean up the orphaned file from storage
+		await cleanupOrphanedFile(storageResult.path, 'saveAudioAndGetId');
+		throw dbError;
+	}
 }
 
 /**
@@ -199,25 +291,32 @@ export async function saveTranscriptionAndGetId(
 	);
 
 	// Create database record with transcription metadata
-	const [transcriptionRecord] = await db
-		.insert(transcriptions)
-		.values({
-			filename,
-			userId,
-			chatId: chatId || null,
-			mimeType,
-			fileSize: audioFile.length,
-			duration: duration || null,
-			text,
-			words: words || null,
-			model,
-			storageLocation: storageResult.storageLocation,
-			cloudPath: storageResult.path
-		})
-		.returning();
+	// Wrap in try-catch to cleanup orphaned files on DB failure
+	try {
+		const [transcriptionRecord] = await db
+			.insert(transcriptions)
+			.values({
+				filename,
+				userId,
+				chatId: chatId || null,
+				mimeType,
+				fileSize: audioFile.length,
+				duration: duration || null,
+				text,
+				words: words || null,
+				model,
+				storageLocation: storageResult.storageLocation,
+				cloudPath: storageResult.path
+			})
+			.returning();
 
-	// Return database ID
-	return transcriptionRecord.id;
+		// Return database ID
+		return transcriptionRecord.id;
+	} catch (dbError) {
+		// Clean up the orphaned file from storage
+		await cleanupOrphanedFile(storageResult.path, 'saveTranscriptionAndGetId');
+		throw dbError;
+	}
 }
 
 /**
@@ -269,44 +368,60 @@ export async function saveVoiceChangeAndGetId(
 	);
 
 	// Upload output audio to storage (category: 'generated')
-	const outputStorageResult = await storageService.upload(
-		{
-			buffer: outputAudioBuffer,
-			mimeType: outputMimeType,
-			filename: outputFilename
-		},
-		userId,
-		'audio',
-		'generated'
-	);
+	// If this fails, clean up the original file first
+	let outputStorageResult;
+	try {
+		outputStorageResult = await storageService.upload(
+			{
+				buffer: outputAudioBuffer,
+				mimeType: outputMimeType,
+				filename: outputFilename
+			},
+			userId,
+			'audio',
+			'generated'
+		);
+	} catch (uploadError) {
+		// Clean up the original file since output upload failed
+		await cleanupOrphanedFile(originalStorageResult.path, 'saveVoiceChangeAndGetId (original)');
+		throw uploadError;
+	}
 
 	// Create database record with both audio paths
-	const [voiceChangeRecord] = await db
-		.insert(voiceChanges)
-		.values({
-			// Output audio info
-			filename: outputFilename,
-			mimeType: outputMimeType,
-			fileSize: outputAudioBuffer.length,
-			storageLocation: outputStorageResult.storageLocation,
-			cloudPath: outputStorageResult.path,
-			// Original audio info
-			originalFilename,
-			originalMimeType,
-			originalFileSize: originalAudioBuffer.length,
-			originalStorageLocation: originalStorageResult.storageLocation,
-			originalCloudPath: originalStorageResult.path,
-			// Metadata
-			userId,
-			chatId: chatId || null,
-			duration: duration || null,
-			targetVoiceId,
-			model
-		})
-		.returning();
+	// Wrap in try-catch to cleanup orphaned files on DB failure
+	try {
+		const [voiceChangeRecord] = await db
+			.insert(voiceChanges)
+			.values({
+				// Output audio info
+				filename: outputFilename,
+				mimeType: outputMimeType,
+				fileSize: outputAudioBuffer.length,
+				storageLocation: outputStorageResult.storageLocation,
+				cloudPath: outputStorageResult.path,
+				// Original audio info
+				originalFilename,
+				originalMimeType,
+				originalFileSize: originalAudioBuffer.length,
+				originalStorageLocation: originalStorageResult.storageLocation,
+				originalCloudPath: originalStorageResult.path,
+				// Metadata
+				userId,
+				chatId: chatId || null,
+				duration: duration || null,
+				targetVoiceId,
+				model
+			})
+			.returning();
 
-	// Return database ID
-	return voiceChangeRecord.id;
+		// Return database ID
+		return voiceChangeRecord.id;
+	} catch (dbError) {
+		// Clean up both orphaned files from storage
+		await cleanupOrphanedFile(originalStorageResult.path, 'saveVoiceChangeAndGetId (original)');
+		await cleanupOrphanedFile(outputStorageResult.path, 'saveVoiceChangeAndGetId (output)');
+		throw dbError;
+	}
 }
 
 /**
@@ -352,25 +467,32 @@ export async function saveMusicAndGetId(
 	);
 
 	// Create database record with music metadata
-	const [musicRecord] = await db
-		.insert(music)
-		.values({
-			filename,
-			userId,
-			chatId: chatId || null,
-			mimeType,
-			fileSize: audioBuffer.length,
-			durationMs,
-			prompt,
-			model,
-			isInstrumental,
-			storageLocation: storageResult.storageLocation,
-			cloudPath: storageResult.path
-		})
-		.returning();
+	// Wrap in try-catch to cleanup orphaned files on DB failure
+	try {
+		const [musicRecord] = await db
+			.insert(music)
+			.values({
+				filename,
+				userId,
+				chatId: chatId || null,
+				mimeType,
+				fileSize: audioBuffer.length,
+				durationMs,
+				prompt,
+				model,
+				isInstrumental,
+				storageLocation: storageResult.storageLocation,
+				cloudPath: storageResult.path
+			})
+			.returning();
 
-	// Return database ID
-	return musicRecord.id;
+		// Return database ID
+		return musicRecord.id;
+	} catch (dbError) {
+		// Clean up the orphaned file from storage
+		await cleanupOrphanedFile(storageResult.path, 'saveMusicAndGetId');
+		throw dbError;
+	}
 }
 
 /**
@@ -416,25 +538,32 @@ export async function saveSoundEffectAndGetId(
 	);
 
 	// Create database record with sound effect metadata
-	const [soundEffectRecord] = await db
-		.insert(soundEffects)
-		.values({
-			filename,
-			userId,
-			chatId: chatId || null,
-			mimeType,
-			fileSize: audioBuffer.length,
-			durationSeconds: durationSeconds || null,
-			text,
-			promptInfluence: promptInfluence || null,
-			model,
-			storageLocation: storageResult.storageLocation,
-			cloudPath: storageResult.path
-		})
-		.returning();
+	// Wrap in try-catch to cleanup orphaned files on DB failure
+	try {
+		const [soundEffectRecord] = await db
+			.insert(soundEffects)
+			.values({
+				filename,
+				userId,
+				chatId: chatId || null,
+				mimeType,
+				fileSize: audioBuffer.length,
+				durationSeconds: durationSeconds || null,
+				text,
+				promptInfluence: promptInfluence || null,
+				model,
+				storageLocation: storageResult.storageLocation,
+				cloudPath: storageResult.path
+			})
+			.returning();
 
-	// Return database ID
-	return soundEffectRecord.id;
+		// Return database ID
+		return soundEffectRecord.id;
+	} catch (dbError) {
+		// Clean up the orphaned file from storage
+		await cleanupOrphanedFile(storageResult.path, 'saveSoundEffectAndGetId');
+		throw dbError;
+	}
 }
 
 /**

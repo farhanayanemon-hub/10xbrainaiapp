@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types.js';
 import { db } from '$lib/server/db/index.js';
 import { chats } from '$lib/server/db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
+import { isDemoModeRestricted, isModelAllowedForDemo, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
 
 export const GET: RequestHandler = async ({ params, locals }) => {
 	try {
@@ -36,6 +37,13 @@ export const PUT: RequestHandler = async ({ params, request, locals }) => {
 
 		const { title, model, messages, pinned } = await request.json();
 
+		// Check demo mode restrictions - only allow updates with demo-approved models
+		if (isDemoModeRestricted(!!session?.user?.id)) {
+			if (model !== undefined && !isModelAllowedForDemo(model)) {
+				return json({ error: DEMO_MODE_MESSAGES.MODEL_RESTRICTED, type: 'demo_model_restricted' }, { status: 403 });
+			}
+		}
+
 		const updateData: any = {
 			updatedAt: sql`NOW()`
 		};
@@ -68,6 +76,11 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		const session = await locals.auth();
 		if (!session?.user?.id) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
+		}
+
+		// Block chat deletion in demo mode
+		if (isDemoModeRestricted(!!session?.user?.id)) {
+			return json({ error: DEMO_MODE_MESSAGES.GENERAL_RESTRICTION }, { status: 403 });
 		}
 
 		const [deletedChat] = await db

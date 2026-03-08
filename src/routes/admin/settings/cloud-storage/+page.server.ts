@@ -58,13 +58,7 @@ export const actions: Actions = {
     // Validation - require all fields including branding bucket
     if (!r2AccountId || !r2AccessKeyId || !r2SecretAccessKey || !r2BucketName || !r2BrandingBucketName || !r2BrandingPublicUrl) {
       return fail(400, {
-        error: 'All fields are required: Account ID, Access Key ID, Secret Access Key, Bucket Name, Branding Bucket Name, and Branding Public URL',
-        r2AccountId,
-        r2AccessKeyId,
-        r2SecretAccessKey,
-        r2BucketName,
-        r2BrandingBucketName,
-        r2BrandingPublicUrl
+        error: 'All fields are required: Account ID, Access Key ID, Secret Access Key, Bucket Name, Branding Bucket Name, and Branding Public URL'
       })
     }
 
@@ -116,24 +110,12 @@ export const actions: Actions = {
       const updatedSettings = await getCloudStorageSettings();
 
       return {
-        success: true,
-        r2AccountId: updatedSettings.r2_account_id || '',
-        r2AccessKeyId: updatedSettings.r2_access_key_id || '',
-        r2SecretAccessKey: updatedSettings.r2_secret_access_key || '',
-        r2BucketName: updatedSettings.r2_bucket_name || '',
-        r2BrandingBucketName: updatedSettings.r2_branding_bucket_name || '',
-        r2BrandingPublicUrl: updatedSettings.r2_branding_public_url || ''
+        success: true
       }
     } catch (error) {
       console.error('Error saving cloud storage settings:', error)
       return fail(500, {
-        error: 'Failed to save cloud storage settings. Please try again.',
-        r2AccountId,
-        r2AccessKeyId,
-        r2SecretAccessKey,
-        r2BucketName,
-        r2BrandingBucketName,
-        r2BrandingPublicUrl
+        error: 'Failed to save cloud storage settings. Please try again.'
       })
     }
   }

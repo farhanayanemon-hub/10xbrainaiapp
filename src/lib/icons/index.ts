@@ -1,5 +1,6 @@
 // Re-export commonly used icons for the main chat interface
 export { default as ArrowUpIcon } from "@lucide/svelte/icons/arrow-up";
+export { default as HomeIcon } from "@lucide/svelte/icons/home";
 export { default as ChevronDownIcon } from "@lucide/svelte/icons/chevron-down";
 export { default as ChevronLeftIcon } from "@lucide/svelte/icons/chevron-left";
 export { default as ChevronRightIcon } from "@lucide/svelte/icons/chevron-right";
@@ -11,6 +12,7 @@ export { default as ImagesIcon } from "@lucide/svelte/icons/images";
 export { default as LoginIcon } from "@lucide/svelte/icons/log-in";
 export { default as LogOutIcon } from "@lucide/svelte/icons/log-out";
 export { default as MoreHorizontalIcon } from "@lucide/svelte/icons/more-horizontal";
+export { default as MoreVerticalIcon } from "@lucide/svelte/icons/more-vertical";
 export { default as PencilIcon } from "@lucide/svelte/icons/pencil";
 export { default as PinIcon } from "@lucide/svelte/icons/pin";
 export { default as SettingsIcon } from "@lucide/svelte/icons/settings";
@@ -86,7 +88,6 @@ export { default as EyeOffIcon } from "@lucide/svelte/icons/eye-off";
 export { default as CloudIcon } from "@lucide/svelte/icons/cloud";
 export { default as GlobeIcon } from "@lucide/svelte/icons/globe";
 export { default as MenuIcon } from "@lucide/svelte/icons/menu";
-export { default as LayoutIcon } from "@lucide/svelte/icons/layout";
 
 // Audio page icons
 export { default as AudioLinesIcon } from "@lucide/svelte/icons/audio-lines";
@@ -96,6 +97,31 @@ export { default as CirclePlayIcon } from "@lucide/svelte/icons/circle-play";
 export { default as PauseIcon } from "@lucide/svelte/icons/pause";
 export { default as SquareIcon } from "@lucide/svelte/icons/square";
 export { default as Volume2Icon } from "@lucide/svelte/icons/volume-2";
+export { default as VolumeXIcon } from "@lucide/svelte/icons/volume-x";
 export { default as PlusIcon } from "@lucide/svelte/icons/plus";
 export { default as ShuffleIcon } from "@lucide/svelte/icons/shuffle";
 export { default as Music2Icon } from "@lucide/svelte/icons/music-2";
+
+// Media model selector icons
+export { default as SearchIcon } from "@lucide/svelte/icons/search";
+
+// Screenshot capture icon
+export { default as CameraIcon } from "@lucide/svelte/icons/camera";
+
+// Image/video page icons
+export { default as Layers2Icon } from "@lucide/svelte/icons/layers-2";
+
+// Tool calling icon
+export { default as WrenchIcon } from "@lucide/svelte/icons/wrench";
+export { default as Clock4Icon } from "@lucide/svelte/icons/clock-4";
+export { default as DiamondIcon } from "@lucide/svelte/icons/diamond";
+export { default as PaintbrushIcon } from "@lucide/svelte/icons/paintbrush";
+export { default as MaximizeIcon } from "@lucide/svelte/icons/maximize";
+export { default as RefreshCwIcon } from "@lucide/svelte/icons/refresh-cw";
+export { default as ImagePlusIcon } from "@lucide/svelte/icons/image-plus";
+export { default as PaperclipIcon } from "@lucide/svelte/icons/paperclip";
+export { default as ArrowRightLeftIcon } from "@lucide/svelte/icons/arrow-right-left";
+
+// Projects page icons
+export { default as FolderOpenIcon } from "@lucide/svelte/icons/folder-open";
+export { default as MessageSquareIcon } from "@lucide/svelte/icons/message-square";

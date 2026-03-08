@@ -23,6 +23,7 @@ export const thinkLongerTool = tool({
 		perspective_taking: z.boolean().optional().default(true).describe('Whether to consider multiple perspectives and viewpoints (default: true)'),
 		validation_passes: z.number().min(1).max(5).optional().default(2).describe('Number of validation passes to perform on reasoning (default: 2)')
 	}),
+	strict: true, // AI SDK v6: Enable strict mode for reliable tool calls
 	execute: async ({
 		problem,
 		reasoning_depth = 'deep',

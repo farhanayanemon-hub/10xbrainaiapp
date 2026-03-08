@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types.js';
 import { getModelProvider } from '$lib/ai/index.js';
 import type { ImageGenerationParams, AIImageStreamChunk } from '$lib/ai/types.js';
 import { UsageTrackingService, UsageLimitError } from '$lib/server/usage-tracking.js';
+import { isDemoModeRestricted, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -12,15 +13,60 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Authentication required' }, { status: 401 });
 		}
 
+		// Check demo mode restrictions
+		if (isDemoModeRestricted(!!session?.user?.id)) {
+			return json({ error: DEMO_MODE_MESSAGES.GENERAL_RESTRICTION }, { status: 403 });
+		}
+
 		const body = await request.json();
-		const { model, prompt, quality, size, style, stream = false, partial_images = 2, chatId, imageUrl, seed } = body;
+		const { model, prompt, quality, size, style, stream = false, partial_images = 2, chatId, imageUrl, imageUrls, seed, numberOfImages, upscaleFactor, compressionQuality } = body;
 
 		if (!model) {
 			return json({ error: 'Model is required' }, { status: 400 });
 		}
 
-		if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+		// Get provider and model config early to check if prompt is required
+		const provider = getModelProvider(model);
+		if (!provider) {
+			return json({ error: `No provider found for model: ${model}` }, { status: 400 });
+		}
+
+		const modelConfig = provider.models.find(m => m.name === model);
+
+		// Check if model requires text input (upscalers don't need prompts)
+		const requiresPrompt = modelConfig?.supportsTextInput !== false;
+
+		if (requiresPrompt && (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0)) {
 			return json({ error: 'Prompt is required and must be a non-empty string' }, { status: 400 });
+		}
+
+		// Validate seed if provided (must be a non-negative 32-bit integer)
+		const MAX_SEED = 2147483647; // 32-bit signed integer max
+		if (seed !== undefined && seed !== null) {
+			const seedNum = Number(seed);
+			if (!Number.isInteger(seedNum) || seedNum < 0 || seedNum > MAX_SEED) {
+				return json({ error: `Seed must be a non-negative integer (max ${MAX_SEED})` }, { status: 400 });
+			}
+		}
+
+		// Validate imageUrls if provided (must be an array of strings)
+		if (imageUrls !== undefined && imageUrls !== null) {
+			if (!Array.isArray(imageUrls)) {
+				return json({ error: 'imageUrls must be an array' }, { status: 400 });
+			}
+			for (const url of imageUrls) {
+				if (typeof url !== 'string') {
+					return json({ error: 'Each imageUrl must be a string' }, { status: 400 });
+				}
+			}
+		}
+
+		// Validate compressionQuality if provided (must be 1-100)
+		if (compressionQuality !== undefined && compressionQuality !== null) {
+			const compNum = Number(compressionQuality);
+			if (!Number.isInteger(compNum) || compNum < 1 || compNum > 100) {
+				return json({ error: 'compressionQuality must be an integer between 1 and 100' }, { status: 400 });
+			}
 		}
 
 		// Check usage limits for image generation
@@ -28,18 +74,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			await UsageTrackingService.checkUsageLimit(session.user.id, 'image');
 		} catch (error) {
 			if (error instanceof UsageLimitError) {
-				return json({ 
-					error: error.message, 
+				return json({
+					error: error.message,
 					type: 'usage_limit_exceeded',
-					remainingQuota: error.remainingQuota 
+					remainingQuota: error.remainingQuota
 				}, { status: 429 });
 			}
 			throw error; // Re-throw other errors
-		}
-
-		const provider = getModelProvider(model);
-		if (!provider) {
-			return json({ error: `No provider found for model: ${model}` }, { status: 400 });
 		}
 
 		if (!provider.generateImage) {
@@ -47,14 +88,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		// Check if model supports streaming when requested
-		const modelConfig = provider.models.find(m => m.name === model);
 		if (stream && !modelConfig?.supportsImageStreaming) {
 			return json({ error: `Model ${model} does not support streaming image generation` }, { status: 400 });
 		}
 
 		const params: ImageGenerationParams = {
 			model,
-			prompt: prompt.trim(),
+			prompt: prompt?.trim() || '',
 			quality,
 			size,
 			style,
@@ -63,7 +103,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			userId: session.user.id,
 			chatId,
 			imageUrl,
-			seed
+			imageUrls,
+			seed,
+			numberOfImages,
+			upscaleFactor,
+			compressionQuality
 		};
 
 		const response = await provider.generateImage(params);

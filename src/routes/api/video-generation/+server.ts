@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types.js';
 import { getModelProvider } from '$lib/ai/index.js';
 import type { VideoGenerationParams } from '$lib/ai/types.js';
 import { UsageTrackingService, UsageLimitError } from '$lib/server/usage-tracking.js';
+import { isDemoModeRestricted, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
@@ -12,8 +13,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Authentication required' }, { status: 401 });
 		}
 
+		// Check demo mode restrictions
+		if (isDemoModeRestricted(!!session?.user?.id)) {
+			return json({ error: DEMO_MODE_MESSAGES.GENERAL_RESTRICTION }, { status: 403 });
+		}
+
 		const body = await request.json();
-		const { model, prompt, duration, resolution, fps, imageUrl, chatId, seed } = body;
+		const { model, prompt, duration, resolution, fps, imageUrl, chatId, seed, quality, style, imageEndUrl } = body;
 
 		if (!model) {
 			return json({ error: 'Model is required' }, { status: 400 });
@@ -46,6 +52,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'FPS must be a number between 1 and 60' }, { status: 400 });
 		}
 
+		// Validate seed if provided (must be a non-negative 32-bit integer)
+		const MAX_SEED = 2147483647; // 32-bit signed integer max
+		if (seed !== undefined && seed !== null) {
+			const seedNum = Number(seed);
+			if (!Number.isInteger(seedNum) || seedNum < 0 || seedNum > MAX_SEED) {
+				return json({ error: `Seed must be a non-negative integer (max ${MAX_SEED})` }, { status: 400 });
+			}
+		}
+
 		const provider = getModelProvider(model);
 		if (!provider) {
 			return json({ error: `No provider found for model: ${model}` }, { status: 400 });
@@ -66,15 +81,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Image URL is required for image-to-video models' }, { status: 400 });
 		}
 
-		// For models that support image input, validate imageUrl format if provided
-		if (imageUrl && modelConfig.supportsImageInput) {
-			try {
-				new URL(imageUrl);
-			} catch {
-				return json({ error: 'Invalid image URL format' }, { status: 400 });
-			}
-		}
-
 		const params: VideoGenerationParams = {
 			model,
 			prompt: prompt.trim(),
@@ -84,7 +90,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			userId: session.user.id,
 			chatId,
 			imageUrl,
-			seed
+			seed,
+			quality,
+			style,
+			imageEndUrl
 		};
 
 		console.log('🎯 Video generation API called:', {

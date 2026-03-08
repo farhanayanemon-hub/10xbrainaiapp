@@ -25,56 +25,24 @@
   let showTwitterSecret = $state(false);
   let showFacebookSecret = $state(false);
 
-  // Reactive form values - initialize with current settings or form data
+  // Reactive form values - initialize from server-loaded settings
   // Note: Use strict equality (=== true) to ensure switches default to false when undefined
   // This matches the server-side logic that uses (=== 'true') for database values
-  let googleEnabled = $state(
-    form?.googleEnabled !== undefined
-      ? form.googleEnabled
-      : data?.settings?.googleEnabled === true
-  );
-  let googleClientId = $state(
-    form?.googleClientId || data?.settings?.googleClientId || ""
-  );
-  let googleClientSecret = $state(
-    form?.googleClientSecret || data?.settings?.googleClientSecret || ""
-  );
+  let googleEnabled = $state(data?.settings?.googleEnabled === true);
+  let googleClientId = $state(data?.settings?.googleClientId || "");
+  let googleClientSecret = $state(data?.settings?.googleClientSecret || "");
 
-  let appleEnabled = $state(
-    form?.appleEnabled !== undefined
-      ? form.appleEnabled
-      : data?.settings?.appleEnabled === true
-  );
-  let appleClientId = $state(
-    form?.appleClientId || data?.settings?.appleClientId || ""
-  );
-  let appleClientSecret = $state(
-    form?.appleClientSecret || data?.settings?.appleClientSecret || ""
-  );
+  let appleEnabled = $state(data?.settings?.appleEnabled === true);
+  let appleClientId = $state(data?.settings?.appleClientId || "");
+  let appleClientSecret = $state(data?.settings?.appleClientSecret || "");
 
-  let twitterEnabled = $state(
-    form?.twitterEnabled !== undefined
-      ? form.twitterEnabled
-      : data?.settings?.twitterEnabled === true
-  );
-  let twitterClientId = $state(
-    form?.twitterClientId || data?.settings?.twitterClientId || ""
-  );
-  let twitterClientSecret = $state(
-    form?.twitterClientSecret || data?.settings?.twitterClientSecret || ""
-  );
+  let twitterEnabled = $state(data?.settings?.twitterEnabled === true);
+  let twitterClientId = $state(data?.settings?.twitterClientId || "");
+  let twitterClientSecret = $state(data?.settings?.twitterClientSecret || "");
 
-  let facebookEnabled = $state(
-    form?.facebookEnabled !== undefined
-      ? form.facebookEnabled
-      : data?.settings?.facebookEnabled === true
-  );
-  let facebookClientId = $state(
-    form?.facebookClientId || data?.settings?.facebookClientId || ""
-  );
-  let facebookClientSecret = $state(
-    form?.facebookClientSecret || data?.settings?.facebookClientSecret || ""
-  );
+  let facebookEnabled = $state(data?.settings?.facebookEnabled === true);
+  let facebookClientId = $state(data?.settings?.facebookClientId || "");
+  let facebookClientSecret = $state(data?.settings?.facebookClientSecret || "");
 
   // State sync effect
   $effect(() => {

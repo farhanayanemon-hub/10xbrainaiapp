@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { getStripePublishableKey, getActivePaymentProvider } from '$lib/server/settings-store';
+import { getStripePublishableKey } from '$lib/server/settings-store';
 import { env } from '$env/dynamic/private';
 
 export const load: PageServerLoad = async () => {
@@ -12,22 +12,17 @@ export const load: PageServerLoad = async () => {
       console.warn('No Stripe publishable key configured in database settings or environment variables');
     }
 
-    // Get active payment provider for branding
-    const activeProvider = await getActivePaymentProvider();
-
     console.log('Checkout page loading with Stripe key from:', dbPublishableKey ? 'database settings' : 'environment variable');
 
     return {
-      stripePublishableKey: stripePublishableKey || '',
-      activeProvider
+      stripePublishableKey: stripePublishableKey || ''
     };
   } catch (error) {
     console.error('Failed to load payment settings for checkout:', error);
-
+    
     // Fallback to environment variable
     return {
-      stripePublishableKey: env.PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
-      activeProvider: 'stripe' as const
+      stripePublishableKey: env.PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
     };
   }
 };

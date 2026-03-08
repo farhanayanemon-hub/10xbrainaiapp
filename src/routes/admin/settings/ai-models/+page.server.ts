@@ -12,7 +12,6 @@ export const load: PageServerLoad = async () => {
       settings: {
         openrouterApiKey: settings.openrouter_api_key || "",
         replicateApiKey: settings.replicate_api_key || "",
-        openaiApiKey: settings.openai_api_key || "",
         elevenlabsApiKey: settings.elevenlabs_api_key || ""
       },
       isDemoMode: isDemoModeEnabled()
@@ -24,7 +23,6 @@ export const load: PageServerLoad = async () => {
       settings: {
         openrouterApiKey: "",
         replicateApiKey: "",
-        openaiApiKey: "",
         elevenlabsApiKey: ""
       },
       isDemoMode: isDemoModeEnabled()
@@ -45,50 +43,26 @@ export const actions: Actions = {
 
     const openrouterApiKey = data.get('openrouterApiKey')?.toString()
     const replicateApiKey = data.get('replicateApiKey')?.toString()
-    const openaiApiKey = data.get('openaiApiKey')?.toString()
     const elevenlabsApiKey = data.get('elevenlabsApiKey')?.toString()
 
     // Validation for OpenRouter API Key
     if (openrouterApiKey && openrouterApiKey.length < 10) {
       return fail(400, {
-        error: 'OpenRouter API key is too short. Please provide a valid API key.',
-        openrouterApiKey,
-        replicateApiKey,
-        openaiApiKey,
-        elevenlabsApiKey
+        error: 'OpenRouter API key is too short. Please provide a valid API key.'
       })
     }
 
     // Validation for Replicate API Token
     if (replicateApiKey && !replicateApiKey.startsWith('r8_')) {
       return fail(400, {
-        error: 'Invalid Replicate API token format. It should start with "r8_".',
-        openrouterApiKey,
-        replicateApiKey,
-        openaiApiKey,
-        elevenlabsApiKey
-      })
-    }
-
-    // Validation for OpenAI API Key
-    if (openaiApiKey && !openaiApiKey.startsWith('sk-')) {
-      return fail(400, {
-        error: 'Invalid OpenAI API key format. It should start with "sk-".',
-        openrouterApiKey,
-        replicateApiKey,
-        openaiApiKey,
-        elevenlabsApiKey
+        error: 'Invalid Replicate API token format. It should start with "r8_".'
       })
     }
 
     // Validation for ElevenLabs API Key
     if (elevenlabsApiKey && elevenlabsApiKey.length < 10) {
       return fail(400, {
-        error: 'ElevenLabs API key is too short. Please provide a valid API key.',
-        openrouterApiKey,
-        replicateApiKey,
-        openaiApiKey,
-        elevenlabsApiKey
+        error: 'ElevenLabs API key is too short. Please provide a valid API key.'
       })
     }
 
@@ -113,9 +87,6 @@ export const actions: Actions = {
       if (shouldSaveValue(replicateApiKey, currentSettings.replicate_api_key)) {
         settingsToSave.push({ key: 'replicate_api_key', value: replicateApiKey!.trim(), category: 'ai_models', description: 'Replicate API token for image/video generation models (encrypted)' });
       }
-      if (shouldSaveValue(openaiApiKey, currentSettings.openai_api_key)) {
-        settingsToSave.push({ key: 'openai_api_key', value: openaiApiKey!.trim(), category: 'ai_models', description: 'OpenAI API key for specific OpenAI models via Replicate (encrypted)' });
-      }
       if (shouldSaveValue(elevenlabsApiKey, currentSettings.elevenlabs_api_key)) {
         settingsToSave.push({ key: 'elevenlabs_api_key', value: elevenlabsApiKey!.trim(), category: 'ai_models', description: 'ElevenLabs API key for text-to-speech models (encrypted)' });
       }
@@ -134,20 +105,12 @@ export const actions: Actions = {
       const updatedSettings = await getAIModelSettings();
 
       return {
-        success: true,
-        openrouterApiKey: updatedSettings.openrouter_api_key || '',
-        replicateApiKey: updatedSettings.replicate_api_key || '',
-        openaiApiKey: updatedSettings.openai_api_key || '',
-        elevenlabsApiKey: updatedSettings.elevenlabs_api_key || ''
+        success: true
       }
     } catch (error) {
       console.error('Error saving AI model settings:', error)
       return fail(500, {
-        error: 'Failed to save AI model settings. Please try again.',
-        openrouterApiKey,
-        replicateApiKey,
-        openaiApiKey,
-        elevenlabsApiKey
+        error: 'Failed to save AI model settings. Please try again.'
       })
     }
   }

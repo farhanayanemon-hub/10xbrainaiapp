@@ -24,7 +24,6 @@ export const actions: Actions = {
     const tier = data.get('tier')?.toString()
     const stripePriceId = data.get('stripePriceId')?.toString()
     const priceAmount = data.get('priceAmount')?.toString()
-    const priceAmountBdt = data.get('priceAmountBdt')?.toString()
     const currency = data.get('currency')?.toString() || 'usd'
     const billingInterval = data.get('billingInterval')?.toString()
     const textGenerationLimit = data.get('textGenerationLimit')?.toString()
@@ -41,7 +40,6 @@ export const actions: Actions = {
         tier,
         stripePriceId,
         priceAmount,
-        priceAmountBdt,
         currency,
         billingInterval,
         textGenerationLimit,
@@ -59,7 +57,6 @@ export const actions: Actions = {
         tier,
         stripePriceId,
         priceAmount,
-        priceAmountBdt,
         currency,
         billingInterval,
         textGenerationLimit,
@@ -77,7 +74,6 @@ export const actions: Actions = {
         tier,
         stripePriceId,
         priceAmount,
-        priceAmountBdt,
         currency,
         billingInterval,
         textGenerationLimit,
@@ -96,7 +92,6 @@ export const actions: Actions = {
         tier,
         stripePriceId,
         priceAmount,
-        priceAmountBdt,
         currency,
         billingInterval,
         textGenerationLimit,
@@ -105,29 +100,6 @@ export const actions: Actions = {
         audioGenerationLimit,
         features
       })
-    }
-
-    // Parse BDT price (optional - can be null)
-    let priceAmountBdtNum: number | null = null
-    if (priceAmountBdt && priceAmountBdt.trim() !== '') {
-      priceAmountBdtNum = parseInt(priceAmountBdt)
-      if (isNaN(priceAmountBdtNum) || priceAmountBdtNum < 0) {
-        return fail(400, {
-          error: 'BDT price amount must be a valid positive number',
-          name,
-          tier,
-          stripePriceId,
-          priceAmount,
-          priceAmountBdt,
-          currency,
-          billingInterval,
-          textGenerationLimit,
-          imageGenerationLimit,
-          videoGenerationLimit,
-          audioGenerationLimit,
-          features
-        })
-      }
     }
 
     try {
@@ -153,7 +125,6 @@ export const actions: Actions = {
         tier: tier as 'free' | 'starter' | 'pro' | 'advanced',
         stripePriceId,
         priceAmount: priceAmountNum,
-        priceAmountBdt: priceAmountBdtNum,
         currency,
         billingInterval: billingInterval as 'month' | 'year',
         textGenerationLimit: textLimit !== null && !isNaN(textLimit) ? textLimit : null,
@@ -178,7 +149,6 @@ export const actions: Actions = {
         tier,
         stripePriceId,
         priceAmount,
-        priceAmountBdt,
         currency,
         billingInterval,
         textGenerationLimit,

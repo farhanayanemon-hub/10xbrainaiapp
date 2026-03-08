@@ -16,6 +16,11 @@
   let fileInputLight = $state<HTMLInputElement>();
   let fileInputFavicon = $state<HTMLInputElement>();
 
+  // Client-side preview URLs (shown immediately on file selection)
+  let previewDark = $state<string | null>(null);
+  let previewLight = $state<string | null>(null);
+  let previewFavicon = $state<string | null>(null);
+
   // Reactive form values - initialize with current settings or form data
   let logoWidth = $state(form?.logoWidth || data?.settings?.logoWidth || "170");
   let logoHeight = $state(
@@ -29,6 +34,23 @@
       logoWidth = data.settings.logoWidth || "170";
       logoHeight = data.settings.logoHeight || "27";
     }
+  });
+
+  // Cleanup object URLs on component destroy to prevent memory leaks
+  $effect(() => {
+    return () => {
+      if (previewDark) URL.revokeObjectURL(previewDark);
+      if (previewLight) URL.revokeObjectURL(previewLight);
+      if (previewFavicon) URL.revokeObjectURL(previewFavicon);
+    };
+  });
+
+  // Clear file inputs on mount to ensure clean state after page refresh
+  // (browsers may retain selected files in inputs across refreshes)
+  $effect(() => {
+    if (fileInputDark) fileInputDark.value = "";
+    if (fileInputLight) fileInputLight.value = "";
+    if (fileInputFavicon) fileInputFavicon.value = "";
   });
 
   function validateImageFile(file: File, target: HTMLInputElement): boolean {
@@ -52,8 +74,21 @@
   function handleFileChange(event: Event) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
-    if (file) {
-      validateImageFile(file, target);
+    if (file && validateImageFile(file, target)) {
+      // Create client-side preview URL
+      const previewUrl = URL.createObjectURL(file);
+
+      // Determine which input and update corresponding preview
+      if (target.id === "logoDark") {
+        if (previewDark) URL.revokeObjectURL(previewDark);
+        previewDark = previewUrl;
+      } else if (target.id === "logoLight") {
+        if (previewLight) URL.revokeObjectURL(previewLight);
+        previewLight = previewUrl;
+      } else if (target.id === "favicon") {
+        if (previewFavicon) URL.revokeObjectURL(previewFavicon);
+        previewFavicon = previewUrl;
+      }
     }
   }
 
@@ -142,9 +177,24 @@
     enctype="multipart/form-data"
     use:enhance={() => {
       isSubmitting = true;
-      return async ({ update }) => {
+      return async ({ update, result }) => {
         await update();
         isSubmitting = false;
+        // Clear previews after successful save - server URLs now take precedence
+        if (result.type === "success") {
+          if (previewDark) {
+            URL.revokeObjectURL(previewDark);
+            previewDark = null;
+          }
+          if (previewLight) {
+            URL.revokeObjectURL(previewLight);
+            previewLight = null;
+          }
+          if (previewFavicon) {
+            URL.revokeObjectURL(previewFavicon);
+            previewFavicon = null;
+          }
+        }
       };
     }}
     class="space-y-6"
@@ -190,9 +240,10 @@
               <div
                 class="w-32 h-32 bg-gray-900 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-600"
               >
-                {#if form?.currentLogoDark || data?.settings?.currentLogoDark}
+                {#if previewDark || form?.currentLogoDark || data?.settings?.currentLogoDark}
                   <img
-                    src={form?.currentLogoDark ||
+                    src={previewDark ||
+                      form?.currentLogoDark ||
                       data?.settings?.currentLogoDark}
                     alt="Current dark logo"
                     class="max-w-full max-h-full object-contain"
@@ -239,9 +290,10 @@
               <div
                 class="w-32 h-32 bg-white rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300"
               >
-                {#if form?.currentLogoLight || data?.settings?.currentLogoLight}
+                {#if previewLight || form?.currentLogoLight || data?.settings?.currentLogoLight}
                   <img
-                    src={form?.currentLogoLight ||
+                    src={previewLight ||
+                      form?.currentLogoLight ||
                       data?.settings?.currentLogoLight}
                     alt="Current light logo"
                     class="max-w-full max-h-full object-contain"
@@ -319,7 +371,7 @@
         </div>
 
         <!-- Logo Dimension Preview -->
-        {#if form?.currentLogoDark || data?.settings?.currentLogoDark || form?.currentLogoLight || data?.settings?.currentLogoLight}
+        {#if previewDark || form?.currentLogoDark || data?.settings?.currentLogoDark || previewLight || form?.currentLogoLight || data?.settings?.currentLogoLight}
           <div class="space-y-4">
             <div class="border-t pt-4">
               <Label class="text-base font-medium">Logo Size Preview</Label>
@@ -330,14 +382,15 @@
 
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Dark Logo Preview -->
-                {#if form?.currentLogoDark || data?.settings?.currentLogoDark}
+                {#if previewDark || form?.currentLogoDark || data?.settings?.currentLogoDark}
                   <div class="space-y-2">
                     <Label class="text-sm font-medium">Dark Mode Preview</Label>
                     <div
                       class="p-4 bg-gray-900 rounded-lg flex items-center justify-center min-h-[80px]"
                     >
                       <img
-                        src={form?.currentLogoDark ||
+                        src={previewDark ||
+                          form?.currentLogoDark ||
                           data?.settings?.currentLogoDark}
                         alt="Dark logo preview"
                         style="width: {logoWidth}px; height: {logoHeight}px;"
@@ -348,7 +401,7 @@
                 {/if}
 
                 <!-- Light Logo Preview -->
-                {#if form?.currentLogoLight || data?.settings?.currentLogoLight}
+                {#if previewLight || form?.currentLogoLight || data?.settings?.currentLogoLight}
                   <div class="space-y-2">
                     <Label class="text-sm font-medium">Light Mode Preview</Label
                     >
@@ -356,7 +409,8 @@
                       class="p-4 bg-white border rounded-lg flex items-center justify-center min-h-[80px]"
                     >
                       <img
-                        src={form?.currentLogoLight ||
+                        src={previewLight ||
+                          form?.currentLogoLight ||
                           data?.settings?.currentLogoLight}
                         alt="Light logo preview"
                         style="width: {logoWidth}px; height: {logoHeight}px;"
@@ -387,9 +441,9 @@
               <div
                 class="w-21 h-21 bg-white rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 shadow-sm"
               >
-                {#if form?.currentFavicon || data?.settings?.currentFavicon}
+                {#if previewFavicon || form?.currentFavicon || data?.settings?.currentFavicon}
                   <img
-                    src={form?.currentFavicon || data?.settings?.currentFavicon}
+                    src={previewFavicon || form?.currentFavicon || data?.settings?.currentFavicon}
                     alt="Current favicon"
                     class="max-w-full max-h-full object-contain"
                   />
@@ -434,7 +488,7 @@
             </div>
 
             <!-- Favicon Preview -->
-            {#if form?.currentFavicon || data?.settings?.currentFavicon}
+            {#if previewFavicon || form?.currentFavicon || data?.settings?.currentFavicon}
               <div class="space-y-4">
                 <div class="border-t pt-4">
                   <Label class="text-base font-medium">Favicon Preview</Label>
@@ -448,7 +502,8 @@
                       class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-800 rounded-t-lg border-b-2 border-blue-500 min-w-[200px]"
                     >
                       <img
-                        src={form?.currentFavicon ||
+                        src={previewFavicon ||
+                          form?.currentFavicon ||
                           data?.settings?.currentFavicon}
                         alt="Favicon preview"
                         class="w-4 h-4"

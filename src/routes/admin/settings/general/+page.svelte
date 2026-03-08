@@ -19,19 +19,24 @@
   let siteName = $state(form?.siteName || data?.settings?.siteName || "");
   let siteTitle = $state(form?.siteTitle || data?.settings?.siteTitle || "");
   let siteDescription = $state(
-    form?.siteDescription || data?.settings?.siteDescription || ""
+    form?.siteDescription || data?.settings?.siteDescription || "",
   );
   let selectedDefaultLanguage = $state(
-    form?.defaultLanguage || data?.settings?.defaultLanguage || "en"
+    form?.defaultLanguage || data?.settings?.defaultLanguage || "en",
   );
   let selectedDefaultTheme = $state(
-    form?.defaultTheme || data?.settings?.defaultTheme || "dark"
+    form?.defaultTheme || data?.settings?.defaultTheme || "dark",
   );
   let selectedDefaultPage = $state(
-    form?.defaultPage || data?.settings?.defaultPage || "landing"
+    form?.defaultPage || data?.settings?.defaultPage || "landing",
+  );
+  let publicOrigin = $state(
+    form?.publicOrigin || data?.settings?.publicOrigin || "",
   );
   let openrouterSystemPrompt = $state(
-    form?.openrouterSystemPrompt || data?.settings?.openrouterSystemPrompt || ""
+    form?.openrouterSystemPrompt ||
+      data?.settings?.openrouterSystemPrompt ||
+      "",
   );
 
   // Character count for system prompt
@@ -44,6 +49,7 @@
     { value: "de", label: "German" },
     { value: "es", label: "Spanish" },
     { value: "pt", label: "Portuguese" },
+    { value: "ar", label: "Arabic" },
   ];
 
   // Theme options
@@ -61,17 +67,17 @@
 
   const languageLabel = $derived(
     languageOptions.find((lang) => lang.value === selectedDefaultLanguage)
-      ?.label ?? "English"
+      ?.label ?? "English",
   );
 
   const themeLabel = $derived(
     themeOptions.find((theme) => theme.value === selectedDefaultTheme)?.label ??
-      "Dark"
+      "Dark",
   );
 
   const pageLabel = $derived(
     pageOptions.find((page) => page.value === selectedDefaultPage)?.label ??
-      "Landing Page"
+      "Landing Page",
   );
 
   // Success message state
@@ -98,6 +104,7 @@
       selectedDefaultLanguage = data.settings.defaultLanguage || "en";
       selectedDefaultTheme = data.settings.defaultTheme || "dark";
       selectedDefaultPage = data.settings.defaultPage || "landing";
+      publicOrigin = data.settings.publicOrigin || "";
       openrouterSystemPrompt = data.settings.openrouterSystemPrompt || "";
     }
   });
@@ -231,6 +238,22 @@
           />
           <p class="text-xs text-muted-foreground">
             Used for SEO meta descriptions and site information
+          </p>
+        </div>
+
+        <div class="space-y-2">
+          <Label for="publicOrigin">App Domain/URL</Label>
+          <Input
+            id="publicOrigin"
+            name="publicOrigin"
+            type="url"
+            placeholder="https://example.com"
+            bind:value={publicOrigin}
+            disabled={data.isDemoMode}
+          />
+          <p class="text-xs text-muted-foreground">
+            The public URL of your application (e.g., https://yourdomain.com).
+            Used for email links, cookie domain, and security headers
           </p>
         </div>
       </Card.Content>

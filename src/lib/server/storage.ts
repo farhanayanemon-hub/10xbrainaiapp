@@ -2,7 +2,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { writeFile, readFile, unlink, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
 import { randomUUID } from 'crypto';
 // Import environment variables with fallbacks for undefined vars
 import * as env from '$env/static/private';
@@ -52,8 +52,32 @@ export class LocalStorageProvider extends StorageProvider {
 		this.basePath = basePath;
 	}
 
+	/**
+	 * Validates that a path doesn't escape the base directory (prevents path traversal attacks).
+	 * @param userPath - The user-provided path segment
+	 * @returns The validated, resolved full path
+	 * @throws Error if path traversal is detected
+	 */
+	private validatePath(userPath: string): string {
+		// Reject paths that obviously contain traversal patterns
+		if (userPath.includes('..') || userPath.startsWith('/') || userPath.startsWith('\\')) {
+			throw new Error('Invalid path: path traversal detected');
+		}
+
+		const fullPath = join(process.cwd(), this.basePath, userPath);
+		const resolvedPath = resolve(fullPath);
+		const baseResolved = resolve(join(process.cwd(), this.basePath));
+
+		// Ensure the resolved path is within the base directory
+		if (!resolvedPath.startsWith(baseResolved + sep) && resolvedPath !== baseResolved) {
+			throw new Error('Invalid path: path traversal detected');
+		}
+
+		return resolvedPath;
+	}
+
 	async upload(file: StorageFile, path: string): Promise<StorageResult> {
-		const fullPath = join(process.cwd(), this.basePath, path);
+		const fullPath = this.validatePath(path);
 		const dir = join(fullPath, '..');
 
 		// Ensure directory exists
@@ -70,8 +94,8 @@ export class LocalStorageProvider extends StorageProvider {
 	}
 
 	async download(path: string): Promise<Buffer> {
-		const fullPath = join(process.cwd(), this.basePath, path);
-		
+		const fullPath = this.validatePath(path);
+
 		if (!existsSync(fullPath)) {
 			throw new Error(`File not found: ${path}`);
 		}
@@ -80,14 +104,20 @@ export class LocalStorageProvider extends StorageProvider {
 	}
 
 	async delete(path: string): Promise<void> {
-		const fullPath = join(process.cwd(), this.basePath, path);
-		
+		const fullPath = this.validatePath(path);
+
 		if (existsSync(fullPath)) {
 			await unlink(fullPath);
 		}
 	}
 
 	async getUrl(path: string): Promise<string> {
+		// SvelteKit serves files from static/ folder at the root URL
+		// So /static/uploads/x should be served as /uploads/x
+		const staticPrefix = 'static/';
+		if (this.basePath.startsWith(staticPrefix)) {
+			return `/${this.basePath.slice(staticPrefix.length)}/${path}`;
+		}
 		return `/${this.basePath}/${path}`;
 	}
 
@@ -97,8 +127,13 @@ export class LocalStorageProvider extends StorageProvider {
 	}
 
 	async exists(path: string): Promise<boolean> {
-		const fullPath = join(process.cwd(), this.basePath, path);
-		return existsSync(fullPath);
+		try {
+			const fullPath = this.validatePath(path);
+			return existsSync(fullPath);
+		} catch {
+			// Path validation failed, file doesn't exist in a valid location
+			return false;
+		}
 	}
 }
 

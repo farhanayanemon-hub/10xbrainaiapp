@@ -4,6 +4,8 @@ import type { AIModelConfig, AIMessage, AIResponse } from "$lib/ai/types.js";
 import { isMultimodal } from "$lib/ai/types.js";
 import { toast } from "svelte-sonner";
 import { GUEST_MESSAGE_LIMIT, GUEST_ALLOWED_MODELS } from "$lib/constants/guest-limits.js";
+import { supportsWebSearch, appendWebSearchSuffix, removeWebSearchSuffix } from "$lib/constants/web-search.js";
+import { isTextFileMimeType } from "$lib/utils/file-types.js";
 
 // File attachment types
 export interface AttachedFile {
@@ -28,6 +30,7 @@ export class ChatState {
   error = $state<string | null>(null);
   models = $state<AIModelConfig[]>([]);
   currentChatId = $state<string | null>(null);
+  currentProjectId = $state<string | null>(null);
   userId = $state<string | null>(null);
   chatHistory = $state<
     Array<{
@@ -35,10 +38,18 @@ export class ChatState {
       title: string;
       model: string;
       pinned: boolean;
+      isBranch: boolean;
+      projectId?: string | null;
       createdAt: string;
       updatedAt: string;
     }>
   >([]);
+
+  // Branch state for current chat
+  currentChatIsBranch = $state(false);
+  currentChatBranchAtIndex = $state<number | null>(null);
+  currentChatBranchSourceId = $state<string | null>(null);
+  currentChatBranchSourceTitle = $state<string | null>(null);
 
   // Loading states
   isLoadingChat = $state(false);
@@ -57,7 +68,6 @@ export class ChatState {
 
   // File attachment state
   attachedFiles = $state<AttachedFile[]>([]);
-  isUploadingFiles = $state(false);
 
   // Guest user limitations
   guestMessageCount = $state(0);
@@ -67,6 +77,30 @@ export class ChatState {
 
   // Track fresh chat creation to preserve tool selection
   isFreshChat = $state(false);
+
+  // Web search toggle state
+  webSearchEnabled = $state(false);
+
+  // Favorite models state
+  favoriteModels = $state<Set<string>>(new Set());
+  isLoadingFavorites = $state(false);
+
+  // Track active tool invocations during streaming
+  activeToolInvocations = $state<Map<string, {
+    toolCallId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    state: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+    result?: unknown;
+    error?: string;
+  }>>(new Map());
+
+  // Track which message is being retried
+  retryingMessageIndex = $state<number | null>(null);
+
+  // Edit message state
+  editingMessageIndex = $state<number | null>(null);
+  editingMessageContent = $state("");
 
   constructor() {
     // Auto-load models when state is created
@@ -98,9 +132,11 @@ export class ChatState {
           this.loadChatHistory();
           this.resetGuestMessageCount();
           this.loadModels(); // Reload models to get full access
+          this.loadFavorites(); // Load user's favorite models
         } else {
           // User logged out, clear chat history and load guest count
           this.chatHistory = [];
+          this.favoriteModels = new Set(); // Clear favorites for guests
           this.loadGuestMessageCount();
           this.loadModels(); // Reload models to get restricted access
         }
@@ -108,14 +144,35 @@ export class ChatState {
     });
   }
 
-  // Function to clean and normalize message content
+  // Function to clean and normalize message content while preserving code blocks
   cleanMessageContent(content: string): string {
-    return content
-      .trim() // Remove leading/trailing whitespace
-      .replace(/[ \t]{3,}/g, " ") // Replace 3+ consecutive spaces/tabs with single space
-      .replace(/\n{3,}/g, "\n\n") // Replace 3+ consecutive newlines with double newline
-      .replace(/[ \t]+\n/g, "\n") // Remove trailing spaces before newlines
-      .replace(/\n[ \t]+/g, "\n"); // Remove leading spaces after newlines
+    if (!content) return '';
+
+    // Split content into code blocks and non-code segments
+    // Match fenced code blocks (```...```) with optional language specifier
+    const codeBlockRegex = /(```[\s\S]*?```)/g;
+    const segments = content.split(codeBlockRegex);
+
+    // Process each segment - only clean non-code segments
+    const processedSegments = segments.map((segment, index) => {
+      // Odd indices are code blocks (captured groups)
+      const isCodeBlock = segment.startsWith('```') && segment.endsWith('```');
+
+      if (isCodeBlock) {
+        // Preserve code blocks exactly as-is
+        return segment;
+      }
+
+      // Clean non-code text
+      return segment
+        .replace(/[ \t]{3,}/g, " ")    // Replace 3+ consecutive spaces/tabs with single space
+        .replace(/\n{3,}/g, "\n\n")    // Replace 3+ consecutive newlines with double newline
+        .replace(/[ \t]+\n/g, "\n");   // Remove trailing spaces before newlines
+        // NOTE: Removed the regex that strips leading whitespace after newlines
+        // as it was destroying code indentation and nested markdown structures
+    });
+
+    return processedSegments.join('').trim();
   }
 
   // Load models from API
@@ -163,6 +220,64 @@ export class ChatState {
         this.isLoadingModels = false;
       }, 1500); // Wait for OpenRouter enrichment to complete
     }
+  }
+
+  // Load favorite models from API
+  async loadFavorites() {
+    if (!this.userId) {
+      this.favoriteModels = new Set();
+      return;
+    }
+
+    try {
+      this.isLoadingFavorites = true;
+      const response = await fetch('/api/models/favorites');
+      if (response.ok) {
+        const data = await response.json();
+        this.favoriteModels = new Set(data.favorites);
+      }
+    } catch (err) {
+      console.error('Failed to load favorites:', err);
+    } finally {
+      this.isLoadingFavorites = false;
+    }
+  }
+
+  // Toggle favorite status for a model
+  async toggleFavorite(modelName: string) {
+    if (!this.userId) {
+      toast.error('Sign in to save favorite models');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/models/${encodeURIComponent(modelName)}/favorite`, {
+        method: 'PATCH'
+      });
+
+      if (response.ok) {
+        const { isFavorite, modelName: name } = await response.json();
+        if (isFavorite) {
+          this.favoriteModels = new Set([...this.favoriteModels, name]);
+          toast.success('Model added to favorites');
+        } else {
+          const newFavorites = new Set(this.favoriteModels);
+          newFavorites.delete(name);
+          this.favoriteModels = newFavorites;
+          toast.success('Model removed from favorites');
+        }
+      } else {
+        toast.error('Failed to update favorites');
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err);
+      toast.error('Failed to update favorites');
+    }
+  }
+
+  // Check if a model is favorited
+  isFavorite(modelName: string): boolean {
+    return this.favoriteModels.has(modelName);
   }
 
   // Load guest message count from sessionStorage
@@ -217,7 +332,9 @@ export class ChatState {
 
   // Validate model selection using server-provided flags
   validateModelSelection(modelName: string): boolean {
-    const model = this.models.find(m => m.name === modelName);
+    // Strip :online suffix if present (web search enabled models)
+    const baseModelName = removeWebSearchSuffix(modelName);
+    const model = this.models.find(m => m.name === baseModelName);
     if (!model) {
       console.warn(`Model ${modelName} not found in available models`);
       return false;
@@ -251,6 +368,10 @@ export class ChatState {
 
     this.selectedModel = modelName;
     this.error = null;
+
+    // Clear web search if new model doesn't support it
+    this.clearWebSearchIfUnsupported();
+
     return true;
   }
 
@@ -328,14 +449,38 @@ export class ChatState {
         // Small delay to ensure smooth transition
         await new Promise((resolve) => setTimeout(resolve, 50));
 
+        // Detect if the stored model had web search enabled (has :online suffix)
+        const storedModel = data.chat.model;
+        const hadWebSearchEnabled = storedModel.endsWith(':online');
+
         // Set model first, then messages to avoid triggering the dialog
-        this.selectedModel = data.chat.model;
-        this.previousModel = data.chat.model; // Update previous model to match
+        // Strip :online suffix if present (web search enabled chats store model with suffix)
+        this.selectedModel = removeWebSearchSuffix(storedModel);
+        this.previousModel = removeWebSearchSuffix(storedModel); // Update previous model to match
+
+        // Restore web search state based on stored model
+        // Only enable if both: stored model had :online AND current model still supports it
+        this.webSearchEnabled = hadWebSearchEnabled && supportsWebSearch(this.selectedModel);
         // Clean all message content when loading from database
         this.messages = data.chat.messages.map((msg: AIMessage) => ({
           ...msg,
           content: this.cleanMessageContent(msg.content || ''),
         }));
+
+        // Set branch state for current chat
+        this.currentChatIsBranch = data.chat.isBranch || false;
+        this.currentChatBranchAtIndex = data.chat.branchAtIndex ?? null;
+        this.currentChatBranchSourceId = data.chat.branchSourceChatId ?? null;
+        // Look up source chat title from chat history if available
+        if (data.chat.branchSourceChatId) {
+          const sourceChat = this.chatHistory.find(c => c.id === data.chat.branchSourceChatId);
+          this.currentChatBranchSourceTitle = sourceChat?.title ?? null;
+        } else {
+          this.currentChatBranchSourceTitle = null;
+        }
+
+        // Set project association
+        this.currentProjectId = data.chat.projectId || null;
 
         // Refresh chat history to show updated order
         this.loadChatHistory();
@@ -375,16 +520,36 @@ export class ChatState {
     this.isLoadingChatData = true;
     // Clear chat state
     this.currentChatId = null;
+    this.currentProjectId = null;
     this.messages = [];
     this.error = null;
     this.clearSelectedTool(); // Clear tool selection when starting new chat
     this.resetFreshChatFlag(); // Reset fresh chat flag when starting new chat
+    this.webSearchEnabled = false; // Reset web search toggle for new chats
+    // Reset branch state for new chat
+    this.currentChatIsBranch = false;
+    this.currentChatBranchAtIndex = null;
+    this.currentChatBranchSourceId = null;
+    this.currentChatBranchSourceTitle = null;
     // Sync previous model with current selection
     this.previousModel = this.selectedModel;
     // Navigate to new chat page
     goto("/newchat", { replaceState: true, noScroll: true });
     // Reset loading flag
     this.isLoadingChatData = false;
+  }
+
+  /**
+   * Prepare ChatState for starting a new chat within a project.
+   * Called from the project detail page before handleSubmit.
+   */
+  startProjectChat(projectId: string) {
+    this.currentProjectId = projectId;
+    this.currentChatId = null;
+    this.messages = [];
+    this.error = null;
+    this.clearSelectedTool();
+    this.resetFreshChatFlag();
   }
 
   // Save or update chat
@@ -501,7 +666,8 @@ export class ChatState {
           body: JSON.stringify({
             title,
             model,
-            messages
+            messages,
+            projectId: this.currentProjectId || undefined,
           }),
         });
 
@@ -685,63 +851,6 @@ export class ChatState {
     this.attachedFiles = [];
   }
 
-  async uploadAttachedFiles(): Promise<void> {
-    if (this.attachedFiles.length === 0) return;
-
-    this.isUploadingFiles = true;
-
-    try {
-      for (const file of this.attachedFiles) {
-        if (file.type.startsWith('image/') && !file.uploadedImageId) {
-          // Upload image files to server
-          const formData = new FormData();
-          formData.append('file', file.file);
-
-          // Convert file to base64 for API
-          const reader = new FileReader();
-          const base64Promise = new Promise<string>((resolve, reject) => {
-            reader.onload = () => {
-              const result = reader.result as string;
-              const base64Data = result.split(',')[1]; // Remove data URL prefix
-              resolve(base64Data);
-            };
-            reader.onerror = reject;
-          });
-          reader.readAsDataURL(file.file);
-
-          const base64Data = await base64Promise;
-
-          const response = await fetch('/api/images', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              imageData: base64Data,
-              mimeType: file.type,
-              filename: file.name,
-              chatId: this.currentChatId
-            })
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            file.uploadedImageId = result.imageId;
-            file.uploadedImageUrl = result.imageUrl;
-          } else {
-            throw new Error(`Failed to upload ${file.name}`);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      toast.error('Failed to upload files');
-      throw error;
-    } finally {
-      this.isUploadingFiles = false;
-    }
-  }
-
   // Check if selected model supports image input
   selectedModelSupportsImageInput(): boolean {
     const model = this.models.find(m => m.name === this.selectedModel);
@@ -792,18 +901,55 @@ export class ChatState {
     this.isFreshChat = false;
   }
 
+  // Web search methods
+  /**
+   * Toggle web search for the current chat session.
+   */
+  toggleWebSearch() {
+    this.webSearchEnabled = !this.webSearchEnabled;
+  }
+
+  /**
+   * Check if the currently selected model supports web search.
+   */
+  isWebSearchAvailable(): boolean {
+    return supportsWebSearch(this.selectedModel);
+  }
+
+  /**
+   * Clear web search if the current model doesn't support it.
+   * Should be called when model changes.
+   */
+  clearWebSearchIfUnsupported() {
+    if (!this.isWebSearchAvailable()) {
+      this.webSearchEnabled = false;
+    }
+  }
+
   // Submit chat message
-  async handleSubmit() {
-    if ((!this.prompt && this.attachedFiles.length === 0) || this.isLoading) return;
+  async handleSubmit(providedFiles?: AttachedFile[]) {
+    // Use provided files (from PromptInput) if available, otherwise fall back to internal state
+    const filesToUse = providedFiles && providedFiles.length > 0
+      ? providedFiles
+      : this.attachedFiles;
+
+    if ((!this.prompt && filesToUse.length === 0) || this.isLoading) return;
 
     // Capture the current chat ID and model at the start of the request
     // This ensures we save to the correct chat even if the user navigates away
     const requestChatId = this.currentChatId;
-    const requestModel = this.selectedModel;
+    // Apply web search suffix if enabled and supported
+    const requestModel = this.webSearchEnabled && this.isWebSearchAvailable()
+      ? appendWebSearchSuffix(this.selectedModel)
+      : this.selectedModel;
     let actualChatId = requestChatId; // Will be updated if a new chat is created
 
     // Use the ChatState's selectedTool
     const toolToUse = this.selectedTool;
+
+    // Check if using web search (for synthetic tool UI)
+    const isUsingWebSearch = requestModel.endsWith(':online');
+    const webSearchToolCallId = isUsingWebSearch ? `web_search_${Date.now()}` : null;
 
     // Check guest message limits
     if (!this.canGuestSendMessage()) {
@@ -830,21 +976,65 @@ export class ChatState {
 
     const cleanedPrompt = this.cleanMessageContent(this.prompt);
     // Don't submit if cleaned content is empty and no files attached
-    if (!cleanedPrompt && this.attachedFiles.length === 0) return;
+    if (!cleanedPrompt && filesToUse.length === 0) return;
 
     try {
-      // Upload files first if any
-      if (this.attachedFiles.length > 0) {
-        await this.uploadAttachedFiles();
+      // Upload image files that have dataUrl but no uploadedImageId yet
+      const imageFilesNeedingUpload = filesToUse.filter(f =>
+        f.type.startsWith('image/') && !f.uploadedImageId
+      );
+
+      for (const file of imageFilesNeedingUpload) {
+        try {
+          let base64Data: string;
+
+          if (file.dataUrl) {
+            // Use existing dataUrl (from PromptInput)
+            base64Data = file.dataUrl.split(',')[1]; // Remove data URL prefix
+          } else if (file.file && file.file.size > 0) {
+            // Fallback: read from File object
+            const reader = new FileReader();
+            base64Data = await new Promise<string>((resolve, reject) => {
+              reader.onload = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1]);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(file.file);
+            });
+          } else {
+            console.warn(`Skipping ${file.name}: no dataUrl or valid File object`);
+            continue;
+          }
+
+          const response = await fetch('/api/images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageData: base64Data,
+              mimeType: file.type,
+              filename: file.name,
+              chatId: this.currentChatId
+            })
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            file.uploadedImageId = result.imageId;
+            file.uploadedImageUrl = result.imageUrl;
+          } else {
+            console.error(`Failed to upload ${file.name}:`, await response.text());
+          }
+        } catch (uploadError) {
+          console.error(`Error uploading ${file.name}:`, uploadError);
+        }
       }
 
       // Create user message with attachments
       let messageContent = cleanedPrompt;
 
       // Add text file content to the message if present
-      const textAttachments = this.attachedFiles.filter(f =>
-        f.type.startsWith('text/') || f.type === 'application/json'
-      );
+      const textAttachments = filesToUse.filter(f => isTextFileMimeType(f.type));
       if (textAttachments.length > 0) {
         const fileContents = textAttachments.map(f =>
           `\n\n---\nFile: ${f.name} (${f.type})\n---\n${f.content || ''}`
@@ -855,11 +1045,11 @@ export class ChatState {
       const userMessage: AIMessage = {
         role: "user",
         content: messageContent,
-        type: this.attachedFiles.some(f => f.type.startsWith('image/')) ? "image" : "text"
+        type: filesToUse.some(f => f.type.startsWith('image/')) ? "image" : "text"
       };
 
       // Add image attachments to message (support multiple images)
-      const imageAttachments = this.attachedFiles.filter(f => f.type.startsWith('image/'));
+      const imageAttachments = filesToUse.filter(f => f.type.startsWith('image/'));
       if (imageAttachments.length > 0) {
         // Handle multiple images
         if (imageAttachments.length === 1) {
@@ -869,7 +1059,8 @@ export class ChatState {
             userMessage.imageId = imageAttachment.uploadedImageId;
             userMessage.mimeType = imageAttachment.type;
           } else if (imageAttachment?.dataUrl && imageAttachment.type) {
-            // If we have base64 data but no uploaded ID, use the data directly
+            // Fallback to base64 - this shouldn't happen normally (upload should have succeeded)
+            console.warn('Image upload failed or was skipped, falling back to base64 storage for:', imageAttachment.name);
             const base64Data = imageAttachment.dataUrl.split(',')[1]; // Remove data URL prefix
             userMessage.imageData = base64Data;
             userMessage.mimeType = imageAttachment.type;
@@ -921,6 +1112,17 @@ export class ChatState {
       this.isLoading = true;
       this.isStreamingContent = false; // Reset streaming state for new request
       this.error = null;
+
+      // Add synthetic web search tool invocation for UI (OpenRouter doesn't emit tool events for web search)
+      if (isUsingWebSearch && webSearchToolCallId) {
+        this.activeToolInvocations.set(webSearchToolCallId, {
+          toolCallId: webSearchToolCallId,
+          toolName: 'web_search',
+          args: { query: cleanedPrompt },
+          state: 'input-available'  // Shows "Running" badge
+        });
+        this.activeToolInvocations = new Map(this.activeToolInvocations);  // Trigger reactivity
+      }
 
       // Save chat immediately after user message to prevent loss on refresh
       // Use the captured requestChatId to ensure it's saved to the correct chat
@@ -1022,6 +1224,7 @@ export class ChatState {
             userId: this.userId,
             chatId: actualChatId,
             selectedTool: toolToUse,
+            projectId: this.currentProjectId || undefined,
           }),
         });
 
@@ -1224,8 +1427,6 @@ export class ChatState {
         assistantMessage.mimeType = videoResponse.mimeType;
         requestMessages = [...requestMessages, assistantMessage];
       } else {
-        console.log('💬 Using TEXT CHAT STREAMING API path');
-
         // Enhanced error recovery with retry logic
         const MAX_RETRIES = 3;
         const STREAM_TIMEOUT_MS = 30000; // 30 seconds
@@ -1266,6 +1467,7 @@ export class ChatState {
                 userId: this.userId,
                 chatId: actualChatId,
                 selectedTool: toolToUse, // Pass selected tool for function calling
+                projectId: this.currentProjectId || undefined,
               }),
               signal: abortController.signal,
             });
@@ -1311,6 +1513,58 @@ export class ChatState {
                           throw new Error(parsed.error);
                         }
 
+                        // Handle tool call events - update activeToolInvocations for UI
+                        if (parsed.type === 'tool-call' && parsed.toolCall) {
+                          const { toolCallId, toolName, args } = parsed.toolCall;
+                          console.log(`Tool invoked: ${toolName}`);
+
+                          // Add to active tool invocations with 'input-available' (running) state
+                          this.activeToolInvocations.set(toolCallId, {
+                            toolCallId,
+                            toolName,
+                            args: args || {},
+                            state: 'input-available'
+                          });
+                          // Trigger reactivity by reassigning the Map
+                          this.activeToolInvocations = new Map(this.activeToolInvocations);
+                        }
+
+                        // Handle tool result events - update tool state and append result to content
+                        if (parsed.type === 'tool-result' && parsed.toolResult) {
+                          const { toolCallId, result } = parsed.toolResult;
+
+                          // Update the tool invocation with result
+                          const existing = this.activeToolInvocations.get(toolCallId);
+                          if (existing) {
+                            existing.state = 'output-available';
+                            existing.result = result;
+                            this.activeToolInvocations = new Map(this.activeToolInvocations);
+                          }
+
+                          // Also append string results to accumulated content for backwards compatibility
+                          if (result && typeof result === 'string') {
+                            // Set streaming content flag
+                            if (!this.isStreamingContent) {
+                              this.isStreamingContent = true;
+                            }
+
+                            // Append tool result to accumulated content
+                            accumulatedContent += result;
+
+                            // Update UI with tool result
+                            if (this.currentChatId === actualChatId) {
+                              const messagesCopy = [...this.messages];
+                              const lastMessage = messagesCopy[messagesCopy.length - 1];
+
+                              if (lastMessage && lastMessage.role === 'assistant' && lastMessage.type === 'text') {
+                                lastMessage.content = accumulatedContent;
+                                this.messages = messagesCopy;
+                              }
+                            }
+                          }
+                        }
+
+                        // Handle regular text content
                         if (parsed.content) {
                           // Set streaming content flag on first content arrival
                           if (!this.isStreamingContent) {
@@ -1342,7 +1596,7 @@ export class ChatState {
                           }
                         }
                       } catch (parseError) {
-                        // Ignore parse errors for incomplete chunks
+                        // Ignore parse errors for incomplete chunks (SyntaxError is expected)
                         if (!(parseError instanceof SyntaxError)) {
                           console.error('Error parsing stream chunk:', parseError);
                         }
@@ -1452,13 +1706,652 @@ export class ChatState {
     } finally {
       this.isLoading = false;
       this.isStreamingContent = false; // Reset streaming state
+
+      // Mark web search tool as completed (synthetic tool for OpenRouter web search)
+      if (webSearchToolCallId && this.activeToolInvocations.has(webSearchToolCallId)) {
+        const webSearchTool = this.activeToolInvocations.get(webSearchToolCallId);
+        if (webSearchTool) {
+          webSearchTool.state = 'output-available';  // Shows "Completed" badge
+          webSearchTool.result = { status: 'Web search completed' };
+          this.activeToolInvocations = new Map(this.activeToolInvocations);  // Trigger reactivity
+        }
+      }
+
+      // Copy tool invocations to the last assistant message before clearing
+      // This ensures tool UI persists after streaming ends with "Completed" state
+      if (this.activeToolInvocations.size > 0) {
+        const messagesCopy = [...this.messages];
+        const lastMessage = messagesCopy[messagesCopy.length - 1];
+        if (lastMessage && lastMessage.role === 'assistant') {
+          // Store tool invocations on the message for persistence
+          lastMessage.toolInvocations = [...this.activeToolInvocations.values()];
+          this.messages = messagesCopy;
+        }
+      }
+
+      // Now safe to clear active tool invocations
+      this.activeToolInvocations.clear();
+      this.activeToolInvocations = new Map(); // Trigger reactivity
     }
   }
 
   // Helper function to get model display name
   getModelDisplayName(modelName: string): string {
-    const model = this.models.find((m) => m.name === modelName);
+    if (!this.models) return modelName || "Select model";
+    // Strip :online suffix if present (web search enabled models)
+    const baseModelName = removeWebSearchSuffix(modelName);
+    const model = this.models.find((m) => m.name === baseModelName);
     return model?.displayName || "Select model";
+  }
+
+  // Retry an assistant message (regenerate the response)
+  async retryMessage(assistantMessageIndex: number) {
+    // Validation: ensure valid index
+    if (assistantMessageIndex < 0 || assistantMessageIndex >= this.messages.length) {
+      console.error('Invalid message index for retry');
+      return;
+    }
+
+    const messageToRetry = this.messages[assistantMessageIndex];
+
+    // Validation: ensure this is an assistant message
+    if (messageToRetry.role !== 'assistant') {
+      console.error('Can only retry assistant messages');
+      return;
+    }
+
+    // Prevent retry during active loading
+    if (this.isLoading) {
+      toast.error('Please wait for the current response to complete');
+      return;
+    }
+
+    // Check guest message limits (retry counts as a new API call)
+    if (!this.canGuestSendMessage()) {
+      this.error = `You've reached the ${GUEST_MESSAGE_LIMIT} message limit for guest users. Please sign up for an account to continue chatting.`;
+      toast.error(this.error);
+      return;
+    }
+
+    // Store original message for error recovery
+    const originalMessage = { ...messageToRetry };
+
+    // Set retry state
+    this.retryingMessageIndex = assistantMessageIndex;
+
+    // Capture current state for the request
+    const requestChatId = this.currentChatId;
+
+    // Use the model from the original message or current selection
+    const baseModel = removeWebSearchSuffix(messageToRetry.model || this.selectedModel);
+    const requestModel = this.webSearchEnabled && supportsWebSearch(baseModel)
+      ? appendWebSearchSuffix(baseModel)
+      : baseModel;
+
+    let actualChatId = requestChatId;
+
+    // Check if using web search (for synthetic tool UI)
+    const isUsingWebSearch = requestModel.endsWith(':online');
+    const webSearchToolCallId = isUsingWebSearch ? `web_search_${Date.now()}` : null;
+
+    // Truncate messages to remove the assistant message being retried
+    // This keeps all messages up to but not including the assistant message
+    const messagesBeforeRetry = this.messages.slice(0, assistantMessageIndex);
+    this.messages = messagesBeforeRetry;
+
+    // Build request messages for the API (same as truncated messages)
+    let requestMessages = [...messagesBeforeRetry];
+
+    // Increment guest message count for non-logged users
+    this.incrementGuestMessageCount();
+
+    try {
+      this.isLoading = true;
+      this.isStreamingContent = false;
+      this.error = null;
+
+      // Add synthetic web search tool invocation for UI
+      if (isUsingWebSearch && webSearchToolCallId) {
+        // Find the last user message to get the query
+        const lastUserMessage = messagesBeforeRetry.filter(m => m.role === 'user').pop();
+        this.activeToolInvocations.set(webSearchToolCallId, {
+          toolCallId: webSearchToolCallId,
+          toolName: 'web_search',
+          args: { query: lastUserMessage?.content || '' },
+          state: 'input-available'
+        });
+        this.activeToolInvocations = new Map(this.activeToolInvocations);
+      }
+
+      // Create placeholder assistant message
+      const assistantMessage: AIMessage = {
+        role: "assistant" as const,
+        content: "",
+        model: requestModel,
+        type: originalMessage.type || "text"
+      };
+
+      // Add placeholder to UI
+      if (this.currentChatId === actualChatId) {
+        this.messages = [...this.messages, assistantMessage];
+      }
+
+      // Use streaming API
+      const response = await fetch("/api/chat-stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: requestModel,
+          messages: requestMessages,
+          maxTokens: 4096,
+          temperature: 0.7,
+          userId: this.userId,
+          chatId: actualChatId,
+          selectedTool: this.selectedTool,
+          projectId: this.currentProjectId || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to get response");
+      }
+
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = "";
+
+      if (reader) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+
+                if (data === '[DONE]') {
+                  break;
+                }
+
+                try {
+                  const parsed = JSON.parse(data);
+
+                  if (parsed.error) {
+                    throw new Error(parsed.error);
+                  }
+
+                  // Handle tool call events
+                  if (parsed.type === 'tool-call' && parsed.toolCall) {
+                    const { toolCallId, toolName, args } = parsed.toolCall;
+                    this.activeToolInvocations.set(toolCallId, {
+                      toolCallId,
+                      toolName,
+                      args: args || {},
+                      state: 'input-available'
+                    });
+                    this.activeToolInvocations = new Map(this.activeToolInvocations);
+                  }
+
+                  // Handle tool result events
+                  if (parsed.type === 'tool-result' && parsed.toolResult) {
+                    const { toolCallId, result } = parsed.toolResult;
+                    const existing = this.activeToolInvocations.get(toolCallId);
+                    if (existing) {
+                      existing.state = 'output-available';
+                      existing.result = result;
+                      this.activeToolInvocations = new Map(this.activeToolInvocations);
+                    }
+
+                    if (result && typeof result === 'string') {
+                      if (!this.isStreamingContent) {
+                        this.isStreamingContent = true;
+                      }
+                      accumulatedContent += result;
+
+                      if (this.currentChatId === actualChatId) {
+                        const messagesCopy = [...this.messages];
+                        const lastMessage = messagesCopy[messagesCopy.length - 1];
+                        if (lastMessage && lastMessage.role === 'assistant') {
+                          lastMessage.content = accumulatedContent;
+                          this.messages = messagesCopy;
+                        }
+                      }
+                    }
+                  }
+
+                  // Handle regular text content
+                  if (parsed.content) {
+                    if (!this.isStreamingContent) {
+                      this.isStreamingContent = true;
+                    }
+
+                    accumulatedContent += parsed.content;
+
+                    if (this.currentChatId === actualChatId) {
+                      const messagesCopy = [...this.messages];
+                      const lastMessage = messagesCopy[messagesCopy.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        lastMessage.content = accumulatedContent;
+                        this.messages = messagesCopy;
+                      }
+                    }
+                  }
+                } catch (parseError) {
+                  if (!(parseError instanceof SyntaxError)) {
+                    console.error('Error parsing stream chunk:', parseError);
+                  }
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      }
+
+      // Update assistant message with final content
+      assistantMessage.content = accumulatedContent || "No response received";
+
+      // Add to request messages for saving
+      requestMessages = [...requestMessages, assistantMessage];
+
+      // Save chat after successful retry
+      try {
+        await this.saveChatById(actualChatId, requestMessages, requestModel);
+      } catch (saveError) {
+        console.error("Failed to save chat after retry:", saveError);
+      }
+
+    } catch (err) {
+      console.error("Retry error:", err);
+      this.error = err instanceof Error ? err.message : "Retry failed";
+
+      // Restore the original assistant message on error
+      if (this.currentChatId === requestChatId) {
+        // Remove the placeholder and restore original
+        this.messages = [...messagesBeforeRetry, originalMessage];
+      }
+    } finally {
+      this.isLoading = false;
+      this.isStreamingContent = false;
+      this.retryingMessageIndex = null;
+
+      // Mark web search tool as completed
+      if (webSearchToolCallId && this.activeToolInvocations.has(webSearchToolCallId)) {
+        const webSearchTool = this.activeToolInvocations.get(webSearchToolCallId);
+        if (webSearchTool) {
+          webSearchTool.state = 'output-available';
+          webSearchTool.result = { status: 'Web search completed' };
+          this.activeToolInvocations = new Map(this.activeToolInvocations);
+        }
+      }
+
+      // Copy tool invocations to the last assistant message
+      if (this.activeToolInvocations.size > 0) {
+        const messagesCopy = [...this.messages];
+        const lastMessage = messagesCopy[messagesCopy.length - 1];
+        if (lastMessage && lastMessage.role === 'assistant') {
+          lastMessage.toolInvocations = [...this.activeToolInvocations.values()];
+          this.messages = messagesCopy;
+        }
+      }
+
+      // Clear active tool invocations
+      this.activeToolInvocations.clear();
+      this.activeToolInvocations = new Map();
+    }
+  }
+
+  /**
+   * Create a new chat branching from a specific message.
+   * Copies messages[0..messageIndex] (inclusive) to a new chat.
+   *
+   * @param messageIndex - The index of the last message to include in the branch
+   */
+  async branchFromMessage(messageIndex: number) {
+    // Validation: ensure valid index
+    if (messageIndex < 0 || messageIndex >= this.messages.length) {
+      console.error('Invalid message index for branch');
+      return;
+    }
+
+    // Prevent branching during active loading/streaming
+    if (this.isLoading || this.isStreamingContent) {
+      toast.error('Please wait for the current response to complete');
+      return;
+    }
+
+    // Require authenticated user (guests can't save chats)
+    if (!this.userId) {
+      toast.error('Sign in to create a branch');
+      return;
+    }
+
+    // Require existing chat (can't branch from unsaved)
+    if (!this.currentChatId) {
+      toast.error('Save the chat first before branching');
+      return;
+    }
+
+    try {
+      // Call API to create branch
+      const response = await fetch('/api/chats/branch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceChatId: this.currentChatId,
+          branchAtIndex: messageIndex
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create branch');
+      }
+
+      const { chat: newChat } = await response.json();
+
+      // Show success feedback
+      toast.success('Branched conversation created');
+
+      // Navigate to new chat (don't replace state so user can go back)
+      await goto(`/chat/${newChat.id}`, { replaceState: false, noScroll: true });
+
+      // Refresh chat history in sidebar
+      this.loadChatHistory();
+    } catch (err) {
+      console.error('Branch error:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to create branch');
+    }
+  }
+
+  /**
+   * Start editing a user message.
+   * @param messageIndex - The index of the user message to edit
+   */
+  startEditMessage(messageIndex: number): void {
+    if (messageIndex < 0 || messageIndex >= this.messages.length) return;
+    if (this.messages[messageIndex].role !== 'user') return;
+    if (this.isLoading || this.isStreamingContent) return;
+
+    this.editingMessageIndex = messageIndex;
+    this.editingMessageContent = this.messages[messageIndex].content || "";
+  }
+
+  /**
+   * Cancel edit mode without changes.
+   */
+  cancelEditMessage(): void {
+    this.editingMessageIndex = null;
+    this.editingMessageContent = "";
+  }
+
+  /**
+   * Update editing content as user types.
+   */
+  updateEditingContent(content: string): void {
+    this.editingMessageContent = content;
+  }
+
+  /**
+   * Save edited message and regenerate AI response.
+   * Similar to retryMessage() but modifies user content first.
+   */
+  async saveAndRegenerateMessage(): Promise<void> {
+    const messageIndex = this.editingMessageIndex;
+
+    // Validation
+    if (messageIndex === null || messageIndex < 0) return;
+    if (!this.editingMessageContent.trim()) {
+      toast.error('Message cannot be empty');
+      return;
+    }
+    if (this.isLoading) {
+      toast.error('Please wait for the current response to complete');
+      return;
+    }
+
+    // Check guest message limits
+    if (!this.canGuestSendMessage()) {
+      this.error = `You've reached the ${GUEST_MESSAGE_LIMIT} message limit for guest users. Please sign up for an account to continue chatting.`;
+      toast.error(this.error);
+      return;
+    }
+
+    const originalMessage = this.messages[messageIndex];
+    const cleanedContent = this.cleanMessageContent(this.editingMessageContent);
+
+    // Capture request context
+    const requestChatId = this.currentChatId;
+    const baseModel = removeWebSearchSuffix(this.selectedModel);
+    const requestModel = this.webSearchEnabled && supportsWebSearch(baseModel)
+      ? appendWebSearchSuffix(baseModel)
+      : baseModel;
+    let actualChatId = requestChatId;
+
+    // Check if using web search (for synthetic tool UI)
+    const isUsingWebSearch = requestModel.endsWith(':online');
+    const webSearchToolCallId = isUsingWebSearch ? `web_search_${Date.now()}` : null;
+
+    // Exit edit mode, enter loading state
+    this.editingMessageIndex = null;
+    this.editingMessageContent = "";
+    this.isLoading = true;
+    this.isStreamingContent = false;
+    this.error = null;
+
+    try {
+      // Create updated user message (preserve attachments)
+      const updatedUserMessage: AIMessage = {
+        ...originalMessage,
+        content: cleanedContent,
+      };
+
+      // Truncate messages: keep all before edited message + updated message
+      const messagesUpToEdit = this.messages.slice(0, messageIndex);
+      let requestMessages = [...messagesUpToEdit, updatedUserMessage];
+
+      // Update UI immediately
+      this.messages = requestMessages;
+
+      // Increment guest count
+      this.incrementGuestMessageCount();
+
+      // Add synthetic web search tool invocation for UI
+      if (isUsingWebSearch && webSearchToolCallId) {
+        this.activeToolInvocations.set(webSearchToolCallId, {
+          toolCallId: webSearchToolCallId,
+          toolName: 'web_search',
+          args: { query: cleanedContent },
+          state: 'input-available'
+        });
+        this.activeToolInvocations = new Map(this.activeToolInvocations);
+      }
+
+      // Add placeholder assistant message
+      const assistantMessage: AIMessage = {
+        role: "assistant",
+        content: "",
+        model: requestModel,
+        type: "text"
+      };
+
+      if (this.currentChatId === actualChatId) {
+        this.messages = [...this.messages, assistantMessage];
+      }
+
+      // Stream response
+      const response = await fetch("/api/chat-stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: requestModel,
+          messages: requestMessages,
+          maxTokens: 4096,
+          temperature: 0.7,
+          userId: this.userId,
+          chatId: actualChatId,
+          selectedTool: this.selectedTool,
+          projectId: this.currentProjectId || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to regenerate response");
+      }
+
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = "";
+
+      if (reader) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+
+                if (data === '[DONE]') {
+                  break;
+                }
+
+                try {
+                  const parsed = JSON.parse(data);
+
+                  if (parsed.error) {
+                    throw new Error(parsed.error);
+                  }
+
+                  // Handle tool call events
+                  if (parsed.type === 'tool-call' && parsed.toolCall) {
+                    const { toolCallId, toolName, args } = parsed.toolCall;
+                    this.activeToolInvocations.set(toolCallId, {
+                      toolCallId,
+                      toolName,
+                      args: args || {},
+                      state: 'input-available'
+                    });
+                    this.activeToolInvocations = new Map(this.activeToolInvocations);
+                  }
+
+                  // Handle tool result events
+                  if (parsed.type === 'tool-result' && parsed.toolResult) {
+                    const { toolCallId, result } = parsed.toolResult;
+                    const existing = this.activeToolInvocations.get(toolCallId);
+                    if (existing) {
+                      existing.state = 'output-available';
+                      existing.result = result;
+                      this.activeToolInvocations = new Map(this.activeToolInvocations);
+                    }
+
+                    if (result && typeof result === 'string') {
+                      if (!this.isStreamingContent) {
+                        this.isStreamingContent = true;
+                      }
+                      accumulatedContent += result;
+
+                      if (this.currentChatId === actualChatId) {
+                        const messagesCopy = [...this.messages];
+                        const lastMessage = messagesCopy[messagesCopy.length - 1];
+                        if (lastMessage && lastMessage.role === 'assistant') {
+                          lastMessage.content = accumulatedContent;
+                          this.messages = messagesCopy;
+                        }
+                      }
+                    }
+                  }
+
+                  // Handle regular text content
+                  if (parsed.content) {
+                    if (!this.isStreamingContent) {
+                      this.isStreamingContent = true;
+                    }
+
+                    accumulatedContent += parsed.content;
+
+                    if (this.currentChatId === actualChatId) {
+                      const messagesCopy = [...this.messages];
+                      const lastMessage = messagesCopy[messagesCopy.length - 1];
+                      if (lastMessage && lastMessage.role === 'assistant') {
+                        lastMessage.content = accumulatedContent;
+                        this.messages = messagesCopy;
+                      }
+                    }
+                  }
+                } catch (parseError) {
+                  if (!(parseError instanceof SyntaxError)) {
+                    console.error('Error parsing stream chunk:', parseError);
+                  }
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      }
+
+      // Update assistant message with final content
+      assistantMessage.content = accumulatedContent || "No response received";
+
+      // Add to request messages for saving
+      requestMessages = [...requestMessages, assistantMessage];
+
+      // Save chat after successful edit regeneration
+      try {
+        await this.saveChatById(actualChatId, requestMessages, requestModel);
+      } catch (saveError) {
+        console.error("Failed to save chat after edit:", saveError);
+      }
+
+    } catch (err) {
+      console.error("Edit regeneration error:", err);
+      this.error = err instanceof Error ? err.message : "Failed to regenerate response";
+      toast.error(this.error);
+    } finally {
+      this.isLoading = false;
+      this.isStreamingContent = false;
+
+      // Mark web search tool as completed
+      if (webSearchToolCallId && this.activeToolInvocations.has(webSearchToolCallId)) {
+        const webSearchTool = this.activeToolInvocations.get(webSearchToolCallId);
+        if (webSearchTool) {
+          webSearchTool.state = 'output-available';
+          webSearchTool.result = { status: 'Web search completed' };
+          this.activeToolInvocations = new Map(this.activeToolInvocations);
+        }
+      }
+
+      // Copy tool invocations to the last assistant message
+      if (this.activeToolInvocations.size > 0) {
+        const messagesCopy = [...this.messages];
+        const lastMessage = messagesCopy[messagesCopy.length - 1];
+        if (lastMessage && lastMessage.role === 'assistant') {
+          lastMessage.toolInvocations = [...this.activeToolInvocations.values()];
+          this.messages = messagesCopy;
+        }
+      }
+
+      // Clear active tool invocations
+      this.activeToolInvocations.clear();
+      this.activeToolInvocations = new Map();
+    }
   }
 
   // Setup model change detection effect

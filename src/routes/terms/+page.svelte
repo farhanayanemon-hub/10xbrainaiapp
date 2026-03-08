@@ -1,14 +1,19 @@
 <script lang="ts">
+  import { getContext } from "svelte";
   import Button from "$lib/components/ui/button/button.svelte";
   import { goto } from "$app/navigation";
   import { ArrowLeftIcon } from "$lib/icons/index.js";
+  import type { SettingsState } from "$lib/stores/settings.svelte.js";
+
+  // Get settings from context
+  const settingsState = getContext<SettingsState>("settings");
 </script>
 
 <svelte:head>
-  <title>Terms of Service - AI Models Platform</title>
+  <title>Terms of Service - {settingsState.siteName}</title>
   <meta
     name="description"
-    content="Terms of Service for AI Models Platform. Review our terms and conditions for using our AI-powered services."
+    content="Terms of Service for {settingsState.siteName}. Review our terms and conditions for using our AI-powered services."
   />
 </svelte:head>
 
@@ -26,7 +31,7 @@
     <section class="mb-8">
       <h2 class="text-2xl font-semibold mb-4">1. Acceptance of Terms</h2>
       <p class="mb-4">
-        By accessing and using AI Models Platform (the "Service"), you accept
+        By accessing and using {settingsState.siteName} (the "Service"), you accept
         and agree to be bound by the terms and provision of this agreement. If
         you do not agree to abide by the above, please do not use this service.
       </p>
@@ -35,7 +40,7 @@
     <section class="mb-8">
       <h2 class="text-2xl font-semibold mb-4">2. Description of Service</h2>
       <p class="mb-4">
-        AI Models Platform provides access to multiple artificial intelligence
+        {settingsState.siteName} provides access to multiple artificial intelligence
         models for text generation, image creation, video generation, and other
         AI-powered services. The Service includes both free and paid
         subscription tiers with varying usage limits and features.
@@ -113,7 +118,7 @@
         You retain ownership of content you input into the Service. AI-generated
         content created through the Service is provided to you under a
         non-exclusive license. The Service and its underlying technology remain
-        the property of AI Models Platform and its licensors.
+        the property of {settingsState.siteName} and its licensors.
       </p>
     </section>
 

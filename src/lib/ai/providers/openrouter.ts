@@ -1,11 +1,11 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { streamText, smoothStream, type ModelMessage } from 'ai';
-import type { AIProvider, AIModelConfig, AIMessage, AIResponse, AIStreamChunk, ChatCompletionParams, ArchitectureObject, AITool, AIToolResult } from '../types.js';
+import { streamText, smoothStream, stepCountIs, type ModelMessage } from 'ai';
+import type { AIProvider, AIModelConfig, AIMessage, AIResponse, AIStreamChunk, ChatCompletionParams, ArchitectureObject, AIToolResult } from '../types.js';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db/index.js';
 import { images } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
-import { getOpenRouterApiKey, getOpenRouterSystemPrompt } from '$lib/server/settings-store.js';
+import { getOpenRouterApiKey, getOpenRouterSystemPrompt, getPublicOrigin, getSiteName } from '$lib/server/settings-store.js';
 import { storageService } from '$lib/server/storage.js';
 import type { ToolInstance } from '../tools/index.js';
 
@@ -20,20 +20,26 @@ async function getApiKey(): Promise<string> {
 	}
 }
 
-// Initialize OpenRouter client - will be recreated if needed when API key changes
+// Initialize OpenRouter client - will be recreated if needed when API key, origin, or site name changes
 let cachedOpenRouterClient: ReturnType<typeof createOpenRouter> | null = null;
 let currentApiKey: string | null = null;
+let currentOrigin: string | null = null;
+let currentSiteName: string | null = null;
 
 async function getOpenRouterProvider(): Promise<ReturnType<typeof createOpenRouter>> {
 	const apiKey = await getApiKey();
+	const origin = await getPublicOrigin();
+	const siteName = await getSiteName();
 
-	if (!cachedOpenRouterClient || currentApiKey !== apiKey) {
+	if (!cachedOpenRouterClient || currentApiKey !== apiKey || currentOrigin !== origin || currentSiteName !== siteName) {
 		currentApiKey = apiKey;
+		currentOrigin = origin;
+		currentSiteName = siteName;
 		cachedOpenRouterClient = createOpenRouter({
 			apiKey,
 			headers: {
-				'HTTP-Referer': 'https://localhost:5173',
-				'X-Title': 'CC AI Models'
+				'HTTP-Referer': origin,
+				'X-Title': siteName
 			}
 		});
 	}
@@ -42,6 +48,14 @@ async function getOpenRouterProvider(): Promise<ReturnType<typeof createOpenRout
 }
 
 const OPENROUTER_MODELS: AIModelConfig[] = [
+	{
+		name: 'anthropic/claude-opus-4.6',
+		displayName: 'Claude Opus 4.6',
+		provider: 'Anthropic',
+		maxTokens: 8192,
+		supportsStreaming: true,
+		supportsFunctions: true
+	},
 	{
 		name: 'anthropic/claude-opus-4.5',
 		displayName: 'Claude Opus 4.5',
@@ -67,8 +81,35 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 		supportsFunctions: true
 	},
 	{
-		name: 'openai/gpt-5.1',
-		displayName: 'GPT 5.1',
+		name: 'openai/gpt-5.2',
+		displayName: 'GPT 5.2',
+		provider: 'OpenAI',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsImageInput: true,
+		supportsFunctions: true
+	},
+	{
+		name: 'openai/gpt-5.2-codex',
+		displayName: 'GPT 5.2 Codex',
+		provider: 'OpenAI',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsImageInput: true,
+		supportsFunctions: true
+	},
+	{
+		name: 'openai/gpt-5.2-chat',
+		displayName: 'GPT 5.2 Chat',
+		provider: 'OpenAI',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsImageInput: true,
+		supportsFunctions: true
+	},
+	{
+		name: 'openai/gpt-5.2-pro',
+		displayName: 'GPT 5.2 Pro',
 		provider: 'OpenAI',
 		maxTokens: 4096,
 		supportsStreaming: true,
@@ -77,7 +118,7 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 	},
 	{
 		name: 'openai/gpt-5-mini',
-		displayName: 'GPT-5 Mini',
+		displayName: 'GPT 5 Mini',
 		provider: 'OpenAI',
 		maxTokens: 4096,
 		supportsStreaming: true,
@@ -86,34 +127,7 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 	},
 	{
 		name: 'openai/gpt-5-nano',
-		displayName: 'GPT-5 Nano',
-		provider: 'OpenAI',
-		maxTokens: 4096,
-		supportsStreaming: true,
-		supportsImageInput: true,
-		supportsFunctions: true
-	},
-	{
-		name: 'openai/gpt-5.1-chat',
-		displayName: 'GPT-5.1 Chat',
-		provider: 'OpenAI',
-		maxTokens: 4096,
-		supportsStreaming: true,
-		supportsImageInput: true,
-		supportsFunctions: true
-	},
-	{
-		name: 'openai/gpt-5.1-codex',
-		displayName: 'GPT-5.1 Codex',
-		provider: 'OpenAI',
-		maxTokens: 4096,
-		supportsStreaming: true,
-		supportsImageInput: true,
-		supportsFunctions: true
-	},
-	{
-		name: 'openai/gpt-5.1-codex-max',
-		displayName: 'GPT-5.1 Codex Max',
+		displayName: 'GPT 5 Nano',
 		provider: 'OpenAI',
 		maxTokens: 4096,
 		supportsStreaming: true,
@@ -122,7 +136,7 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 	},
 	{
 		name: 'openai/gpt-4.1-mini',
-		displayName: 'GPT-4.1 Mini',
+		displayName: 'GPT 4.1 Mini',
 		provider: 'OpenAI',
 		maxTokens: 4096,
 		supportsStreaming: true,
@@ -169,6 +183,14 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 		supportsFunctions: true
 	},
 	{
+		name: 'google/gemini-3-flash-preview',
+		displayName: 'Gemini 3 Flash Preview',
+		provider: 'Google',
+		maxTokens: 8192,
+		supportsStreaming: true,
+		supportsFunctions: true
+	},
+	{
 		name: 'google/gemini-2.5-pro',
 		displayName: 'Gemini 2.5 Pro',
 		provider: 'Google',
@@ -197,22 +219,6 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 		displayName: 'Gemma 3 27B (free)',
 		provider: 'Google',
 		maxTokens: 8192,
-		supportsStreaming: true,
-		supportsFunctions: true
-	},
-	{
-		name: 'meta-llama/llama-4-maverick',
-		displayName: 'Llama 4 Maverick',
-		provider: 'Meta',
-		maxTokens: 4096,
-		supportsStreaming: true,
-		supportsFunctions: true
-	},
-	{
-		name: 'meta-llama/llama-4-scout',
-		displayName: 'Llama 4 Scout',
-		provider: 'Meta',
-		maxTokens: 4096,
 		supportsStreaming: true,
 		supportsFunctions: true
 	},
@@ -253,16 +259,8 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 		supportsFunctions: true
 	},
 	{
-		name: 'x-ai/grok-3',
-		displayName: 'Grok 3',
-		provider: 'xAI',
-		maxTokens: 4096,
-		supportsStreaming: true,
-		supportsFunctions: true
-	},
-	{
-		name: 'x-ai/grok-3-mini',
-		displayName: 'Grok 3 Mini',
+		name: 'x-ai/grok-4.1-fast',
+		displayName: 'Grok 4.1 Fast',
 		provider: 'xAI',
 		maxTokens: 4096,
 		supportsStreaming: true,
@@ -271,14 +269,6 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 	{
 		name: 'x-ai/grok-code-fast-1',
 		displayName: 'Grok Code Fast 1',
-		provider: 'xAI',
-		maxTokens: 4096,
-		supportsStreaming: true,
-		supportsFunctions: true
-	},
-	{
-		name: 'x-ai/grok-4-fast',
-		displayName: 'Grok 4 Fast',
 		provider: 'xAI',
 		maxTokens: 4096,
 		supportsStreaming: true,
@@ -308,6 +298,14 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 		supportsFunctions: true
 	},
 	{
+		name: 'moonshotai/kimi-k2.5',
+		displayName: 'Kimi K2.5',
+		provider: 'Moonshot',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsFunctions: true
+	},
+	{
 		name: 'moonshotai/kimi-k2-0905',
 		displayName: 'Kimi K2 0905',
 		provider: 'Moonshot',
@@ -324,15 +322,8 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 		supportsFunctions: true
 	},
 	{
-		name: 'moonshotai/kimi-k2:free',
-		displayName: 'Kimi K2 (free)',
-		provider: 'Moonshot',
-		maxTokens: 4096,
-		supportsStreaming: true
-	},
-	{
 		name: 'mistralai/devstral-2512',
-		displayName: 'Mistral Devstral 2512',
+		displayName: 'Mistral Devstral 2',
 		provider: 'Mistral',
 		maxTokens: 4096,
 		supportsStreaming: true,
@@ -355,6 +346,30 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 		supportsFunctions: true
 	},
 	{
+		name: 'z-ai/glm-5',
+		displayName: 'GLM 5',
+		provider: 'ZAI',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsFunctions: true
+	},
+	{
+		name: 'z-ai/glm-4.7',
+		displayName: 'GLM 4.7',
+		provider: 'ZAI',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsFunctions: true
+	},
+	{
+		name: 'z-ai/glm-4.7-flash',
+		displayName: 'GLM 4.7 Flash',
+		provider: 'ZAI',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsFunctions: true
+	},
+	{
 		name: 'z-ai/glm-4.6v',
 		displayName: 'GLM 4.6V',
 		provider: 'ZAI',
@@ -371,21 +386,37 @@ const OPENROUTER_MODELS: AIModelConfig[] = [
 		supportsFunctions: true
 	},
 	{
-		name: 'z-ai/glm-4.5-air',
-		displayName: 'GLM 4.5 Air',
-		provider: 'ZAI',
+		name: 'minimax/minimax-m2.5',
+		displayName: 'MiniMax M2.5',
+		provider: 'MiniMax',
 		maxTokens: 4096,
 		supportsStreaming: true,
 		supportsFunctions: true
 	},
 	{
-		name: 'z-ai/glm-4.5-air:free',
-		displayName: 'GLM 4.5 Air (free)',
-		provider: 'ZAI',
+		name: 'minimax/minimax-m2.1',
+		displayName: 'MiniMax M2.1',
+		provider: 'MiniMax',
 		maxTokens: 4096,
 		supportsStreaming: true,
 		supportsFunctions: true
-	}
+	},
+	{
+		name: 'meta-llama/llama-4-maverick',
+		displayName: 'Llama 4 Maverick',
+		provider: 'Meta',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsFunctions: true
+	},
+	{
+		name: 'meta-llama/llama-4-scout',
+		displayName: 'Llama 4 Scout',
+		provider: 'Meta',
+		maxTokens: 4096,
+		supportsStreaming: true,
+		supportsFunctions: true
+	},
 ];
 
 // Interface for OpenRouter API model response
@@ -393,7 +424,7 @@ interface OpenRouterModel {
 	id: string;
 	name: string;
 	architecture: ArchitectureObject;
-	// Other fields we don't need for now
+	supported_parameters?: string[]; // e.g., ["temperature", "tools", "json_mode", ...]
 }
 
 interface OpenRouterModelsResponse {
@@ -404,12 +435,14 @@ interface OpenRouterModelsResponse {
 async function enrichModelsWithArchitecture(models: AIModelConfig[]): Promise<AIModelConfig[]> {
 	try {
 		console.log('Fetching architecture data from OpenRouter API...');
+		const origin = await getPublicOrigin();
+		const siteName = await getSiteName();
 
 		const response = await fetch('https://openrouter.ai/api/v1/models', {
 			headers: {
 				'Authorization': `Bearer ${env.OPENROUTER_API_KEY}`,
-				'HTTP-Referer': 'https://localhost:5173',
-				'X-Title': 'CC AI Models'
+				'HTTP-Referer': origin,
+				'X-Title': siteName
 			}
 		});
 
@@ -422,23 +455,29 @@ async function enrichModelsWithArchitecture(models: AIModelConfig[]): Promise<AI
 		console.log(`Fetched ${apiData.data.length} models from OpenRouter API`);
 
 		// Create a map of API models by their ID for efficient lookup
-		const apiModelMap = new Map<string, ArchitectureObject>();
+		const apiModelMap = new Map<string, { architecture: ArchitectureObject; supportedParameters?: string[] }>();
 		apiData.data.forEach(apiModel => {
 			if (apiModel.architecture) {
-				apiModelMap.set(apiModel.id, apiModel.architecture);
+				apiModelMap.set(apiModel.id, {
+					architecture: apiModel.architecture,
+					supportedParameters: apiModel.supported_parameters
+				});
 			}
 		});
 
 		// Enrich hardcoded models with architecture data
 		const enrichedModels = models.map(model => {
-			const architectureData = apiModelMap.get(model.name);
-			if (architectureData) {
-				console.log(`Enriched ${model.name} with architecture data:`, architectureData);
+			const apiData = apiModelMap.get(model.name);
+			if (apiData) {
+				const { architecture: architectureData, supportedParameters } = apiData;
 
-				// Auto-set capability flags from architecture data
+				// Auto-set capability flags from architecture data and supported_parameters
 				const enrichedModel: AIModelConfig = {
 					...model,
 					architecture: architectureData,
+					// Auto-detect function calling support from supported_parameters
+					supportsFunctions: model.supportsFunctions ||
+						supportedParameters?.includes('tools') || false,
 					// Input capabilities from input_modalities
 					supportsImageInput: model.supportsImageInput ||
 						architectureData.input_modalities.includes('image') ||
@@ -457,13 +496,6 @@ async function enrichModelsWithArchitecture(models: AIModelConfig[]): Promise<AI
 					supportsAudioGeneration: model.supportsAudioGeneration ||
 						architectureData.output_modalities.includes('audio')
 				};
-
-				console.log(`  → Auto-set capabilities for ${model.name}:`, {
-					supportsImageInput: enrichedModel.supportsImageInput,
-					supportsVideoInput: enrichedModel.supportsVideoInput,
-					supportsTextGeneration: enrichedModel.supportsTextGeneration,
-					supportsImageGeneration: enrichedModel.supportsImageGeneration
-				});
 
 				return enrichedModel;
 			}
@@ -809,7 +841,7 @@ export const openRouterProvider: AIProvider = {
 	},
 
 	async chat(params: ChatCompletionParams): Promise<AIResponse | AsyncIterableIterator<AIStreamChunk>> {
-		const { model, messages, maxTokens = 4096, temperature = 0.7, stream = false, tools } = params;
+		const { model, messages, maxTokens = 4096, temperature = 0.7, stream = false, toolNames, maxSteps = 1 } = params;
 
 		const provider = await getOpenRouterProvider();
 
@@ -817,25 +849,27 @@ export const openRouterProvider: AIProvider = {
 		const messagesWithSystemPrompt = await prependGlobalSystemPrompt(messages);
 		const convertedMessages = convertMessages(messagesWithSystemPrompt);
 
-		// Tools parameter is legacy AITool[] for API compatibility, but we work with tool names internally
-		// Extract tool names and get the AI SDK v5 tool instances
+		// Get AI SDK v6 tool instances by name
 		let aiSdkTools: Record<string, ToolInstance> | undefined;
-		if (tools && tools.length > 0) {
+		if (toolNames && toolNames.length > 0) {
 			const { getToolsAsObject } = await import('../tools/index.js');
-			// Extract tool names from the AITool format
-			const toolNames = tools
-				.map(t => t.function?.name)
-				.filter((name): name is string => Boolean(name));
 			aiSdkTools = getToolsAsObject(toolNames);
 		}
 
 		try {
+			// When tools are provided, we need at least 2 steps:
+			// Step 1: Model generates tool call
+			// Step 2: Model responds after tool execution
+			// Default to 3 steps to allow for tool execution + follow-up response
+			const effectiveMaxSteps = aiSdkTools ? Math.max(maxSteps, 3) : maxSteps;
+
 			const result = streamText({
 				model: provider.chat(model),
 				messages: convertedMessages,
 				maxOutputTokens: maxTokens,
 				temperature,
 				...(aiSdkTools && { tools: aiSdkTools }),
+				...(effectiveMaxSteps > 1 && { stopWhen: stepCountIs(effectiveMaxSteps) }),
 				experimental_transform: smoothStream({
 					delayInMs: 20,
 					chunking: 'word'
@@ -885,10 +919,13 @@ export const openRouterProvider: AIProvider = {
 		temperature?: number;
 		userId?: string;
 		chatId?: string;
-		tools?: AITool[];
+		/** Tool names to enable for this request */
+		toolNames?: string[];
+		/** Maximum steps for multi-step tool execution (default: 1) */
+		maxSteps?: number;
 		stream?: boolean;
 	}): Promise<AIResponse | AsyncIterableIterator<AIStreamChunk>> {
-		const { model, messages, maxTokens = 4096, temperature = 0.7, tools, stream = false } = params;
+		const { model, messages, maxTokens = 4096, temperature = 0.7, toolNames, maxSteps = 1, stream = false } = params;
 
 		const provider = await getOpenRouterProvider();
 
@@ -898,15 +935,10 @@ export const openRouterProvider: AIProvider = {
 		// Convert messages to multimodal format
 		const multimodalMessages = await convertMultimodalMessages(messagesWithSystemPrompt, params.userId);
 
-		// Tools parameter is legacy AITool[] for API compatibility, but we work with tool names internally
-		// Extract tool names and get the AI SDK v5 tool instances
+		// Get AI SDK v6 tool instances by name
 		let aiSdkTools: Record<string, ToolInstance> | undefined;
-		if (tools && tools.length > 0) {
+		if (toolNames && toolNames.length > 0) {
 			const { getToolsAsObject } = await import('../tools/index.js');
-			// Extract tool names from the AITool format
-			const toolNames = tools
-				.map(t => t.function?.name)
-				.filter((name): name is string => Boolean(name));
 			aiSdkTools = getToolsAsObject(toolNames);
 		}
 
@@ -916,12 +948,19 @@ export const openRouterProvider: AIProvider = {
 		console.log('  - Messages structure:', JSON.stringify(multimodalMessages, null, 2));
 
 		try {
+			// When tools are provided, we need at least 2 steps:
+			// Step 1: Model generates tool call
+			// Step 2: Model responds after tool execution
+			// Default to 3 steps to allow for tool execution + follow-up response
+			const effectiveMaxSteps = aiSdkTools ? Math.max(maxSteps, 3) : maxSteps;
+
 			const result = streamText({
 				model: provider.chat(model),
 				messages: multimodalMessages,
 				maxOutputTokens: maxTokens,
 				temperature,
 				...(aiSdkTools && { tools: aiSdkTools }),
+				...(effectiveMaxSteps > 1 && { stopWhen: stepCountIs(effectiveMaxSteps) }),
 				experimental_transform: smoothStream({
 					delayInMs: 20,
 					chunking: 'word'
@@ -968,27 +1007,64 @@ export const openRouterProvider: AIProvider = {
 };
 
 // Create async iterator for AI SDK streaming responses
+// Uses fullStream to capture all events including tool calls and results
 async function* createAISDKStreamIterator(result: any): AsyncIterableIterator<AIStreamChunk> {
 	try {
-		for await (const chunk of result.textStream) {
-			yield {
-				content: chunk,
-				done: false
-			};
+		for await (const part of result.fullStream) {
+			switch (part.type) {
+				case 'text-delta':
+					yield {
+						content: part.text,
+						done: false,
+						type: 'text'
+					};
+					break;
+
+				case 'tool-call':
+					yield {
+						content: '',
+						done: false,
+						type: 'tool-call',
+						toolCall: {
+							toolCallId: part.toolCallId,
+							toolName: part.toolName,
+							args: part.input // AI SDK v6 uses 'input' not 'args'
+						}
+					};
+					break;
+
+				case 'tool-result':
+					yield {
+						content: '',
+						done: false,
+						type: 'tool-result',
+						toolResult: {
+							toolCallId: part.toolCallId,
+							toolName: part.toolName,
+							result: part.result
+						}
+					};
+					break;
+
+				case 'finish':
+					const usage = await result.usage;
+					yield {
+						content: '',
+						done: true,
+						type: 'finish',
+						finishReason: part.finishReason,
+						usage: usage ? {
+							promptTokens: usage.inputTokens || 0,
+							completionTokens: usage.outputTokens || 0,
+							totalTokens: (usage.inputTokens || 0) + (usage.outputTokens || 0)
+						} : undefined
+					};
+					break;
+
+				case 'error':
+					throw new Error(part.error?.message || 'Unknown streaming error');
+			}
 		}
-
-		// Get final usage information - usage is a promise
-		const usage = await result.usage;
-
-		yield {
-			content: '',
-			done: true,
-			usage: usage ? {
-				promptTokens: usage.inputTokens || 0,
-				completionTokens: usage.outputTokens || 0,
-				totalTokens: (usage.inputTokens || 0) + (usage.outputTokens || 0)
-			} : undefined
-		};
 	} catch (error) {
 		throw new Error(`OpenRouter streaming error: ${error instanceof Error ? error.message : 'Unknown error'}`);
 	}

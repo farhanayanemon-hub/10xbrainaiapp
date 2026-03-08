@@ -4,6 +4,7 @@ import { db } from '$lib/server/db/index.js';
 import { images } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { storageService } from '$lib/server/storage.js';
+import { isDemoModeRestricted, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js';
 
 // Get image by ID (secure with authentication and authorization)
 export const GET: RequestHandler = async ({ params, locals }) => {
@@ -81,5 +82,73 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 			throw err;
 		}
 		throw error(500, 'Failed to retrieve image');
+	}
+};
+
+// Delete image by ID (secure with authentication and authorization)
+export const DELETE: RequestHandler = async ({ params, locals }) => {
+	try {
+		// Check authentication
+		const session = await locals.auth();
+		if (!session?.user?.id) {
+			throw error(401, 'Authentication required');
+		}
+
+		// Check demo mode restrictions
+		if (isDemoModeRestricted(!!session?.user?.id)) {
+			throw error(403, DEMO_MODE_MESSAGES.GENERAL_RESTRICTION);
+		}
+
+		const imageId = params.id;
+
+		if (!imageId) {
+			throw error(400, 'Image ID is required');
+		}
+
+		// Validate image ID format (UUID format for database IDs)
+		if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(imageId)) {
+			throw error(400, 'Invalid image ID format');
+		}
+
+		// Query database to get image metadata and verify ownership
+		const [imageRecord] = await db
+			.select()
+			.from(images)
+			.where(eq(images.id, imageId));
+
+		if (!imageRecord) {
+			throw error(404, 'Image not found');
+		}
+
+		// Check authorization - user can only delete their own images
+		if (imageRecord.userId !== session.user.id) {
+			throw error(403, 'Access denied - you can only delete your own images');
+		}
+
+		// Delete from storage if cloudPath exists
+		if (imageRecord.cloudPath) {
+			try {
+				await storageService.delete(imageRecord.cloudPath);
+			} catch (storageError) {
+				console.error('Storage deletion error:', storageError);
+				// Continue with database deletion even if storage deletion fails
+			}
+		}
+
+		// Delete from database
+		await db.delete(images).where(eq(images.id, imageId));
+
+		return new Response(JSON.stringify({ success: true, message: 'Image deleted successfully' }), {
+			status: 200,
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		});
+	} catch (err) {
+		console.error('Image deletion error:', err);
+		if (err instanceof Error && 'status' in err) {
+			throw err;
+		}
+		throw error(500, 'Failed to delete image');
 	}
 };

@@ -12,6 +12,7 @@ export const deepResearchTool = tool({
 		focus_areas: z.array(z.string()).optional().describe('Specific focus areas or sub-topics to research (optional)'),
 		depth_level: z.enum(['surface', 'moderate', 'deep', 'comprehensive']).optional().default('moderate').describe('The depth of research to conduct (default: moderate)')
 	}),
+	strict: true, // AI SDK v6: Enable strict mode for reliable tool calls
 	execute: async ({ topic, focus_areas = [], depth_level = 'moderate' }) => {
 		// Simulate research process with increasing complexity based on depth level
 		const depthConfig = {
