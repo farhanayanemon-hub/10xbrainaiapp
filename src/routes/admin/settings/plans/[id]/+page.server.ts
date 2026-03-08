@@ -11,19 +11,27 @@ export const load: PageServerLoad = async ({ params }) => {
     throw error(404, 'Plan not found')
   }
 
-  const plan = await db
-    .select()
-    .from(pricingPlans)
-    .where(eq(pricingPlans.id, planId))
-    .limit(1)
+  try {
+    const plan = await db
+      .select()
+      .from(pricingPlans)
+      .where(eq(pricingPlans.id, planId))
+      .limit(1)
 
-  if (plan.length === 0) {
-    throw error(404, 'Plan not found')
-  }
+    if (plan.length === 0) {
+      throw error(404, 'Plan not found')
+    }
 
-  return {
-    plan: plan[0],
-    isDemoMode: isDemoModeEnabled()
+    return {
+      plan: plan[0],
+      isDemoMode: isDemoModeEnabled()
+    }
+  } catch (err) {
+    if (err && typeof err === 'object' && 'status' in err) {
+      throw err
+    }
+    console.error('Error loading plan for edit:', err)
+    throw error(500, 'Failed to load plan data. Database may need migration.')
   }
 }
 

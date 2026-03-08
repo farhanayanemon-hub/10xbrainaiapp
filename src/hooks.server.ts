@@ -10,6 +10,9 @@ import type { Session } from "@auth/sveltekit"
 import { securityHeaders } from '$lib/server/security-headers.js'
 import { authRateLimitMiddleware } from '$lib/server/auth-middleware.js'
 import { OpayService } from '$lib/server/opaybd.js'
+import { runAutoMigrations } from '$lib/server/auto-migrate.js'
+
+runAutoMigrations().catch(e => console.error('[Startup] Auto-migration failed:', e));
 
 // Settings handle - loads and caches site settings
 const settingsHandle: Handle = async ({ event, resolve }) => {
