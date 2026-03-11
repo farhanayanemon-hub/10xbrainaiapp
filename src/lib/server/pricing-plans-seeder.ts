@@ -296,3 +296,22 @@ export async function isValidPriceId(priceId: string): Promise<boolean> {
                 return false;
         }
 }
+
+// Helper function to get a plan by its Stripe price ID
+export async function getPlanByPriceId(priceId: string) {
+        try {
+                const [plan] = await db
+                        .select()
+                        .from(pricingPlans)
+                        .where(and(
+                                eq(pricingPlans.stripePriceId, priceId),
+                                eq(pricingPlans.isActive, true)
+                        ))
+                        .limit(1);
+
+                return plan || null;
+        } catch (error) {
+                console.error('Error getting plan by price ID:', error);
+                return null;
+        }
+}

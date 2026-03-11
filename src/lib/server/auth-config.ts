@@ -13,6 +13,7 @@ import { sendWelcomeEmail } from './email.js'
 import { markEmailAsVerified } from './email-verification.js'
 import type { Provider } from "@auth/core/providers"
 import { authSanitizers, validatePasswordSafety } from '../utils/sanitization.js'
+import { isOtpVerificationEnabled } from './settings-store.js'
 import { checkAuthenticationLimits, recordSuccessfulLogin, recordFailedLogin, getClientIP } from './rate-limiting.js'
 import { getSecureCookieConfig, getSecureJWTConfig, sessionSecurityCallbacks, logSecurityEvent } from './session-security.js'
 import { SecurityLogger } from './security-monitoring.js'
@@ -66,7 +67,8 @@ async function buildProviders(): Promise<Provider[]> {
           return null
         }
 
-        if (!user[0].emailVerified) {
+        const otpEnabled = await isOtpVerificationEnabled();
+        if (otpEnabled && !user[0].emailVerified) {
           SecurityLogger.loginFailure(sanitizedEmail, 'Email not verified');
           return null
         }
@@ -447,7 +449,8 @@ async function createDefaultConfig() {
             return null
           }
 
-          if (!user[0].emailVerified) {
+          const otpEnabledFallback = await isOtpVerificationEnabled();
+          if (otpEnabledFallback && !user[0].emailVerified) {
             SecurityLogger.loginFailure(sanitizedEmail, 'Email not verified (fallback)');
             return null
           }

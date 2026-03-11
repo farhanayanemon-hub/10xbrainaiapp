@@ -13,6 +13,15 @@
 
   let { data, form }: { data: PageData; form: ActionData } = $props();
 
+  let otpEnabled = $state(data?.otpVerificationEnabled ?? false);
+  let otpSaving = $state(false);
+
+  $effect(() => {
+    if (form?.otpToggled) {
+      toast.success(`OTP verification ${otpEnabled ? 'enabled' : 'disabled'}`);
+    }
+  });
+
   let activeTab = $state<'smtp' | 'templates'>('smtp');
   let loading = $state(false);
   let showPassword = $state(false);
@@ -151,6 +160,52 @@
       Configure SMTP settings and customize email templates.
     </p>
   </div>
+
+  <Card.Root>
+    <Card.Header>
+      <Card.Title class="text-base">OTP Email Verification</Card.Title>
+      <Card.Description>
+        When enabled, new users must verify their email with a one-time code before they can log in.
+      </Card.Description>
+    </Card.Header>
+    <Card.Content>
+      <form
+        method="POST"
+        action="?/toggleOtp"
+        use:enhance={() => {
+          otpSaving = true;
+          return async ({ update }) => {
+            await update();
+            otpSaving = false;
+          };
+        }}
+      >
+        <input type="hidden" name="otpEnabled" value={otpEnabled ? 'true' : 'false'} />
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium">{otpEnabled ? 'Enabled' : 'Disabled'}</span>
+              <Badge variant={otpEnabled ? 'default' : 'secondary'}>{otpEnabled ? 'ON' : 'OFF'}</Badge>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <Button.Root
+              type="button"
+              variant={otpEnabled ? 'outline' : 'default'}
+              size="sm"
+              disabled={otpSaving || data.isDemoMode}
+              onclick={() => { otpEnabled = !otpEnabled; }}
+            >
+              {otpEnabled ? 'Disable' : 'Enable'}
+            </Button.Root>
+            <Button.Root type="submit" size="sm" disabled={otpSaving || data.isDemoMode}>
+              {otpSaving ? 'Saving...' : 'Save'}
+            </Button.Root>
+          </div>
+        </div>
+      </form>
+    </Card.Content>
+  </Card.Root>
 
   <div class="flex gap-1 border-b">
     <button

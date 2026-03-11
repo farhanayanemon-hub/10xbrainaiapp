@@ -1,16 +1,17 @@
 import type { Actions, PageServerLoad } from './$types'
 import { fail } from '@sveltejs/kit'
 import { getMailingSettings, adminSettingsService } from '$lib/server/admin-settings'
-import { settingsStore } from '$lib/server/settings-store'
+import { settingsStore, isOtpVerificationEnabled } from '$lib/server/settings-store'
 import { emailService } from '$lib/server/email'
 import { EmailTemplateService } from '$lib/server/email-templates.js'
 import { isDemoModeEnabled, DEMO_MODE_MESSAGES } from '$lib/constants/demo-mode.js'
 
 export const load: PageServerLoad = async () => {
   try {
-    const [settings, templates] = await Promise.all([
+    const [settings, templates, otpEnabled] = await Promise.all([
       getMailingSettings(),
-      EmailTemplateService.getTemplateList()
+      EmailTemplateService.getTemplateList(),
+      isOtpVerificationEnabled()
     ])
 
     return {
@@ -23,6 +24,7 @@ export const load: PageServerLoad = async () => {
         fromEmail: settings.from_email || "",
         fromName: settings.from_name || ""
       },
+      otpVerificationEnabled: otpEnabled,
       templates: templates.map(t => ({
         name: t.name,
         label: t.label,
@@ -45,6 +47,7 @@ export const load: PageServerLoad = async () => {
         fromEmail: "",
         fromName: ""
       },
+      otpVerificationEnabled: false,
       templates: [],
       isDemoMode: isDemoModeEnabled()
     }
@@ -123,6 +126,26 @@ export const actions: Actions = {
     } catch (error) {
       console.error('Error saving mailing settings:', error)
       return fail(500, { error: 'Failed to save mailing settings. Please try again.' })
+    }
+  },
+
+  toggleOtp: async ({ request }) => {
+    if (isDemoModeEnabled()) {
+      return fail(403, { error: DEMO_MODE_MESSAGES.ADMIN_SAVE_DISABLED });
+    }
+
+    const data = await request.formData()
+    const enabled = data.get('otpEnabled')?.toString() === 'true'
+
+    try {
+      await adminSettingsService.setSettings([
+        { key: 'otp_verification_enabled', value: enabled ? 'true' : 'false', category: 'general', description: 'Enable OTP email verification during registration' }
+      ]);
+      settingsStore.clearCache();
+      return { success: true, otpToggled: true }
+    } catch (error) {
+      console.error('Error toggling OTP verification:', error)
+      return fail(500, { error: 'Failed to update OTP verification setting' })
     }
   },
 

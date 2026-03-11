@@ -61,6 +61,9 @@ export interface CachedSettings {
   logoHeight: string;
   currentFavicon: string | null;
 
+  // Registration settings
+  otpVerificationEnabled: boolean;
+
   // Metadata
   lastUpdated: Date;
   isFallback?: boolean; // Indicates if these are default/fallback settings due to database error
@@ -166,6 +169,7 @@ const DEFAULT_SETTINGS: Omit<CachedSettings, 'lastUpdated'> = {
   r2BucketName: "",
   r2BrandingBucketName: "",
   r2BrandingPublicUrl: "",
+  otpVerificationEnabled: false,
   turnstileSiteKey: "",
   turnstileSecretKey: "",
   logoUrlDark: "/branding/logos/default-dark-logo.png", // Default fallback for dark mode
@@ -334,6 +338,7 @@ class SettingsStore {
         r2BucketName: cloudStorageSettings.r2_bucket_name || DEFAULT_SETTINGS.r2BucketName,
         r2BrandingBucketName: cloudStorageSettings.r2_branding_bucket_name || DEFAULT_SETTINGS.r2BrandingBucketName,
         r2BrandingPublicUrl: cloudStorageSettings.r2_branding_public_url || DEFAULT_SETTINGS.r2BrandingPublicUrl,
+        otpVerificationEnabled: generalSettings.otp_verification_enabled === 'true',
         turnstileSiteKey: securitySettings.turnstile_site_key || DEFAULT_SETTINGS.turnstileSiteKey,
         turnstileSecretKey: securitySettings.turnstile_secret_key || DEFAULT_SETTINGS.turnstileSecretKey,
         logoUrlDark: brandingDarkFile?.url || DEFAULT_SETTINGS.logoUrlDark,
@@ -631,6 +636,10 @@ export async function getTurnstileSettings() {
 
 export async function getTurnstileSiteKey(): Promise<string> {
   return await settingsStore.getSetting('turnstileSiteKey');
+}
+
+export async function isOtpVerificationEnabled(): Promise<boolean> {
+  return await settingsStore.getSetting('otpVerificationEnabled');
 }
 
 export async function getTurnstileSecretKey(): Promise<string> {

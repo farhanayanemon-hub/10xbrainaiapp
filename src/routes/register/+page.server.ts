@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs"
 import { eq } from "drizzle-orm"
 import { isOAuthProviderEnabled } from '$lib/server/auth-config'
 import { verifyTurnstileToken, isTurnstileEnabled, getTurnstileErrorMessage } from '$lib/server/turnstile'
-import { getTurnstileSiteKey } from '$lib/server/settings-store'
+import { getTurnstileSiteKey, isOtpVerificationEnabled } from '$lib/server/settings-store'
 import { sendOtpEmail } from '$lib/server/email.js'
 import { OtpService } from '$lib/server/otp-service.js'
 import { env } from '$env/dynamic/private'
@@ -133,9 +133,11 @@ export const actions: Actions = {
       // Check if user already exists
       const existingUser = await db.select().from(users).where(eq(users.email, validatedEmail)).limit(1)
 
+      const otpEnabled = await isOtpVerificationEnabled();
+
       if (existingUser.length > 0) {
         const existing = existingUser[0]
-        if (!existing.emailVerified) {
+        if (!existing.emailVerified && otpEnabled) {
           try {
             const otpCode = await OtpService.createOtp(validatedEmail, 'registration')
             await sendOtpEmail({
@@ -168,24 +170,34 @@ export const actions: Actions = {
         const userData = newUser[0]
         SecurityLogger.registrationSuccess(userData.id, userData.email!, clientIP);
 
-        try {
-          const otpCode = await OtpService.createOtp(userData.email!, 'registration')
+        if (otpEnabled) {
+          try {
+            const otpCode = await OtpService.createOtp(userData.email!, 'registration')
 
-          await sendOtpEmail({
-            email: userData.email!,
-            name: userData.name || userData.email!.split('@')[0],
-            otpCode,
-            expiryMinutes: OtpService.getExpiryMinutes(),
-          })
-          SecurityLogger.emailVerificationSent(userData.email!, userData.id);
-          console.log(`[Registration] OTP verification email sent`)
-        } catch (emailError) {
-          console.error(`[Registration] Failed to send OTP email:`, emailError)
-          SecurityLogger.emailVerificationFailure(userData.email!, 'Failed to send OTP email');
+            await sendOtpEmail({
+              email: userData.email!,
+              name: userData.name || userData.email!.split('@')[0],
+              otpCode,
+              expiryMinutes: OtpService.getExpiryMinutes(),
+            })
+            SecurityLogger.emailVerificationSent(userData.email!, userData.id);
+            console.log(`[Registration] OTP verification email sent`)
+          } catch (emailError) {
+            console.error(`[Registration] Failed to send OTP email:`, emailError)
+            SecurityLogger.emailVerificationFailure(userData.email!, 'Failed to send OTP email');
+          }
+        } else {
+          await db.update(users)
+            .set({ emailVerified: new Date() })
+            .where(eq(users.id, userData.id));
+          console.log(`[Registration] OTP disabled - auto-verified user`)
         }
       }
       
-      throw redirect(302, `/verify-otp?email=${encodeURIComponent(validatedEmail)}`)
+      if (otpEnabled) {
+        throw redirect(302, `/verify-otp?email=${encodeURIComponent(validatedEmail)}`)
+      }
+      throw redirect(302, '/login?registered=true')
       
     } catch (error) {
       // Re-throw redirects (SvelteKit redirects have a status property)

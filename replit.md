@@ -1,4 +1,4 @@
-# WeaveAI
+# EzboAI
 
 An AI platform built with SvelteKit that provides access to 65+ AI models for text generation, image generation, video generation, and multimodal chat.
 
@@ -100,8 +100,11 @@ src/
 
 ## OTP Email Verification (Registration)
 
-- New users must verify email via 6-digit OTP code before they can log in
-- Registration flow: fill form → create user (unverified) → send OTP email → redirect to `/verify-otp?email=...` → enter code → email verified → redirect to login
+- OTP verification is togglable via Admin > Settings > Mailing (OTP Email Verification card)
+- Setting key: `otp_verification_enabled` in `general` category, defaults to `false` (disabled)
+- When disabled: new users are auto-verified at registration and can log in immediately
+- When enabled: new users must verify email via 6-digit OTP code before they can log in
+- Registration flow (when enabled): fill form → create user (unverified) → send OTP email → redirect to `/verify-otp?email=...` → enter code → email verified → redirect to login
 - If an unverified user tries to register again, a new OTP is sent and they're redirected to verify
 - DB table: `otp_code` (id, email, code, purpose, attempts, max_attempts, expires, verified, created_at)
 - `OtpService` in `src/lib/server/otp-service.ts`: createOtp, verifyOtp, cleanupExpired

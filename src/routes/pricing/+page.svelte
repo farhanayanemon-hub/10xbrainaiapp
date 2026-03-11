@@ -284,9 +284,8 @@
 
       const result = await response.json();
 
-      // Handle Opaybd provider - redirect to external payment page
-      if (result.provider === 'opaybd') {
-        window.location.href = result.redirectUrl;
+      if (result.provider === 'opaybd' && result.paymentUrl) {
+        window.location.href = result.paymentUrl;
         return;
       }
 
@@ -302,7 +301,7 @@
 </script>
 
 <svelte:head>
-  <title>Pricing Plans - AI Models Platform</title>
+  <title>Pricing Plans - EzboAI</title>
   <meta
     name="description"
     content="Choose the perfect plan for your AI needs. Access 65+ text, image, video generation models."
