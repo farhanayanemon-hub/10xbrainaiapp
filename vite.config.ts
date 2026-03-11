@@ -5,22 +5,23 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	plugins: [
-		paraglideVitePlugin({
-			project: './project.inlang',
-			outdir: './src/paraglide',
-			strategy: ['cookie', 'baseLocale']
-		}),
-		tailwindcss(),
-		sveltekit(),
-		devtoolsJson()
-	],
-	server: {
-		host: '0.0.0.0',
-		port: 5000,
-		allowedHosts: true
-	},
-	ssr: {
-		noExternal: ['layerchart']
-	}
+        plugins: [
+                paraglideVitePlugin({
+                        project: './project.inlang',
+                        outdir: './src/paraglide',
+                        strategy: ['cookie', 'baseLocale']
+                }),
+                tailwindcss(),
+                sveltekit(),
+                devtoolsJson()
+        ],
+        server: {
+                host: '0.0.0.0',
+                port: 5000,
+                strictPort: true,
+                allowedHosts: true
+        },
+        ssr: {
+                noExternal: ['layerchart']
+        }
 });
