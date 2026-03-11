@@ -48,11 +48,39 @@
 
   let showSuccess = $state(false);
   $effect(() => {
-    if (form?.success && !form?.templateSaved && !form?.templateReset) {
+    if (form?.success && !form?.templateSaved && !form?.templateReset && !form?.otpToggled) {
       showSuccess = true;
       setTimeout(() => { showSuccess = false; }, 3000);
     }
   });
+
+  let testEmail = $state('');
+  let testEmailSending = $state(false);
+  let testEmailResult = $state<{ ok: boolean; msg: string } | null>(null);
+
+  async function sendTestEmail() {
+    testEmailResult = null;
+    testEmailSending = true;
+    try {
+      const res = await fetch('/api/admin/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ toEmail: testEmail }),
+      });
+      const data = await res.json();
+      testEmailResult = { ok: data.success, msg: data.message };
+      if (data.success) {
+        toast.success(data.message);
+      } else {
+        toast.error(data.message);
+      }
+    } catch (e) {
+      testEmailResult = { ok: false, msg: 'Request failed. Check your network.' };
+      toast.error('Failed to send test email');
+    } finally {
+      testEmailSending = false;
+    }
+  }
 
   const securityOptions = [
     { value: "false", label: "No (STARTTLS)" },
@@ -351,6 +379,41 @@
         </Button.Root>
       </div>
     </form>
+
+    <Card.Root class="mt-4">
+      <Card.Header>
+        <Card.Title class="text-base">Send Test Email</Card.Title>
+        <Card.Description>
+          Verify your SMTP configuration by sending a test email. Save your settings first before testing.
+        </Card.Description>
+      </Card.Header>
+      <Card.Content>
+        <div class="flex gap-2 items-start">
+          <div class="flex-1 space-y-1">
+            <Input.Root
+              type="email"
+              placeholder="recipient@example.com"
+              bind:value={testEmail}
+              disabled={testEmailSending}
+            />
+          </div>
+          <Button.Root
+            type="button"
+            variant="outline"
+            disabled={testEmailSending || !testEmail}
+            onclick={sendTestEmail}
+          >
+            {testEmailSending ? 'Sending...' : 'Send Test Email'}
+          </Button.Root>
+        </div>
+
+        {#if testEmailResult}
+          <div class="mt-3 rounded-md px-3 py-2.5 text-sm {testEmailResult.ok ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-400' : 'bg-destructive/15 text-destructive'}">
+            {testEmailResult.msg}
+          </div>
+        {/if}
+      </Card.Content>
+    </Card.Root>
   {:else}
     {#if editingTemplate}
       <Card.Root>
